@@ -4,7 +4,7 @@
 // Date           : 2019-08-10
 // Version        : 1.0
 // Description    :
-//   TBD
+//   TODO
 // Modification History:
 //   Date   |   Author   |   Version   |   Change Description
 //======================================================================================================================
@@ -502,7 +502,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
     return (MulDivFlg & funct3[2]);
   endfunction: DivIns
 
-  // TBD: ins type divide 
+  // TODO: ins type divide 
 
   function automatic logic Mul(); // MUL valid
     return (MulDivNoWFlg & f3Oh[0]);
@@ -628,7 +628,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   // Atomic instructions:
-  // TBD: add Atomic ins
+  // TODO: add Atomic ins
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 endinterface: ZionRiscvIsaLib_RvimazDecodeItf
@@ -922,15 +922,43 @@ interface ZionRiscvIsaLib_LoadExItf
   function automatic logic [CPU_WIDTH-1:0] Exec;
     
     logic [CPU_WIDTH-1:0] result;
-    result = '0;
-    for(int i=0;i<(3+RV64);i++)begin: EachLoad
-      logic [CPU_WIDTH-1 :0] eachDat;
-      logic [(8*(2**i))-1:0] datTmp;
-      logic                  msbExtend;
-      datTmp    = memDat[(addr[$high(addr):i])+:$bits(datTmp)];
-      msbExtend = (~unsignedLoad) & datTmp[$high(datTmp)];
-      eachDat   = {$bits(eachDat){loadEn[i]}} & {{(CPU_WIDTH-$bits(datTmp)){msbExtend}},datTmp};
-      result    = result | eachDat;
+    // LB 
+    logic [CPU_WIDTH/8-1:0][7:0] byteSplitDat;
+    logic                  [7:0] byteLoadDat;
+    logic                        byteMsb;
+    logic [CPU_WIDTH-1  :0]      byteLoadRslt;
+    byteSplitDat = memDat;
+    byteLoadDat  = memDat[addr[$high(addr):0]];
+    byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
+    byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
+    // LH
+    logic [CPU_WIDTH/16-1:0][15:0] halfwordSplitDat;
+    logic                   [15:0] halfwordLoadDat;
+    logic                          halfwordMsb;
+    logic [CPU_WIDTH-1   :0]       halfwordLoadRslt;
+    halfwordSplitDat = memDat;
+    halfwordLoadDat  = memDat[addr[$high(addr):1]];
+    halfwordExtend   = (~unsignedLoad) & halfwordLoadDat[$high(halfwordLoadDat)];
+    halfwordLoadRslt = {CPU_WIDTH{loadEn[1]}} & {{(CPU_WIDTH-$bits(halfwordLoadDat)){halfwordExtend}}, halfwordLoadDat};
+    `gen_if(RV64==0)begin
+      // LW
+      logic [CPU_WIDTH-1   :0] wordLoadRslt;
+      wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & memDat;
+      result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt;
+    end `gen_elif(RV64==1)begin
+      // LW
+      logic [CPU_WIDTH/32-1:0][32:0] wordSplitDat;
+      logic                   [32:0] wordLoadDat;
+      logic                          wordMsb;
+      logic [CPU_WIDTH-1   :0]       wordLoadRslt;
+      wordSplitDat = memDat;
+      wordLoadDat  = memDat[addr[$high(addr):2]];
+      wordExtend   = (~unsignedLoad) & wordLoadDat[$high(wordLoadDat)];
+      wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & {{(CPU_WIDTH-$bits(wordLoadDat)){wordExtend}}, wordLoadDat};
+      //LD
+      logic [CPU_WIDTH-1   :0] doubleLoadRslt;
+      doubleLoadRslt = {CPU_WIDTH{loadEn[3]}} & memDat;
+      result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt | doubleLoadRslt;
     end
     return result;
 
@@ -972,24 +1000,49 @@ interface ZionRiscvIsaLib_StoreExItf
 
   function automatic logic [CPU_WIDTH-1:0] Exec;
     
-    logic [CPU_WIDTH  -1:0] rsltDat;
-    logic [CPU_WIDTH/8-1:0] rsltMask;
-    rsltDat  = '0;
-    rsltMask = '0;
-    for(int i=0;i<(2+RV64);i++)begin: EachStore
-      logic [CPU_WIDTH/STORE_WIDTH[i]-1:0][STORE_WIDTH[i]  -1:0] eachDat;
-      logic [CPU_WIDTH/STORE_WIDTH[i]-1:0][STORE_WIDTH[i]/8-1:0] eachMask;
-      for(int j=0;j<CPU_WIDTH/STORE_WIDTH[i];j++)begin: GetPartDat
-        logic wrEn;
-        wrEn        = (addr[$high(addr):i]==j) && storeEn[i];
-        eachMask[i] = {$bits(eachMask[i]){~wrEn}};
-        eachDat[i]  = {$bits(eachDat[i]){wrEn}} & storeDat[0+:$bits(eachDat[i])];
-      end
-      rsltDat  = rsltDat  | eachDat ;
-      rsltMask = rsltMask & eachMask;
+    typedef logic [CPU_WIDTH  -1:0] type_WrDat;
+    typedef logic [CPU_WIDTH/8-1:0] type_WrEn;
+    logic [CPU_WIDTH  -1:0] wrDat;
+    logic [CPU_WIDTH/8-1:0] wrEn;
+    //SB
+    logic [CPU_WIDTH/8-1:0][7:0] byteWrDat;
+    logic [CPU_WIDTH/8-1:0]      byteWrEn;
+    byteWrDat = '0;
+    byteWrEn  = '0;
+    byteWrDat[addr[$high(addr):0]] = {8{storeEn[0]}} & storeDat[0+:8];
+    byteWrEn[addr[$high(addr):0]]  = storeEn[0];
+    //SH
+    logic [CPU_WIDTH/16-1:0][15:0] halfwordWrDat;
+    logic [CPU_WIDTH/16-1:0][ 1:0] halfwordWrEn;
+    halfwordWrDat = '0;
+    halfwordWrEn  = '0;
+    halfwordWrDat[addr[$high(addr):1]] = {16{storeEn[1]}} & storeDat[0+:16];
+    halfwordWrEn[addr[$high(addr):1]]  = {2{storeEn[1]}};
+    `gen_if(RV64==0) begin
+      //SW
+      logic [CPU_WIDTH/-1:0] wordWrDat;
+      logic [           3:0] wordWrEn;
+      wordWrDat = {31storeEn[2]} & storeDat;
+      wordWrEn  = {4{storeEn[2]}};
+      wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | wordWrDat;
+      wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | wordWrEn;
+    end `gen_elif(RV64==1) begin
+      //SW
+      logic [CPU_WIDTH/32-1:0][32:0] wordWrDat;
+      logic [CPU_WIDTH/32-1:0][ 3:0] wordWrEn;
+      wordWrDat = '0;
+      wordWrEn  = '0;
+      wordWrDat[addr[$high(addr):2]] = {32{storeEn[2]}} & storeDat[0+:32];
+      wordWrEn[addr[$high(addr):2]]  = {4{storeEn[2]}};
+      //SD
+      logic [CPU_WIDTH/-1:0] doubleWrDat;
+      logic [           7:0] doubleWrEn;
+      doubleWrDat = {31storeEn[3]} & storeDat;
+      doubleWrEn  = {8{storeEn[3]}};
+      wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | type_WrDat'(wordWrDat) | doubleWrDat;
+      wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | type_WrEn'(wordWrEn)   | doubleWrEn;
     end
-    rsltDat  = rsltDat  | ({$bits(rsltDat){storeEn[$high(storeEn)]}} & storeDat);
-    rsltMask = rsltMask | ({$bits(rsltMask){storeEn[$high(storeEn)]}});
+
     return {rsltMask, rsltDat};
 
   endfunction: Exec
@@ -1006,7 +1059,7 @@ endinterface: ZionRiscvIsaLib_StoreExItf
 // Date           : 2019-08-02
 // Version        : 1.0
 // Description    :
-//   TBD
+//   TODO
 // Modification History:
 //   Date   |   Author   |   Version   |   Change Description
 //======================================================================================================================
