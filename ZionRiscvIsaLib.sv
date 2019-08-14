@@ -4,11 +4,16 @@
 // Date           : 2019-08-10
 // Version        : 1.0
 // Description    :
-//   TODO
+//   The interface is used for riscv general decode, including: 
+//     - RV32I, RV64I, 'M' Extension, 'A' Extension, 'Ziscr'
+//   Float instructions and RV32C is not included. All reusable signals and logic circuits are defined in the 
+//   interface. Users call the functions to get a enable or flag signals. The interface can not be used at port. Thus,
+//   it has no modport.
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
 // Modification History:
 //   Date   |   Author   |   Version   |   Change Description
 //======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
+// 19-08-10 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 `ifndef Disable_ZionRiscvIsaLib_RvimazDecodeItf
 interface ZionRiscvIsaLib_RvimazDecodeItf
@@ -18,16 +23,15 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 );
 
   localparam CPU_WIDTH = 32*(RV64+1);
-  typedef logic signed [CPU_WIDTH-1:0] type_Signed
+  typedef logic signed [CPU_WIDTH-1:0] type_Signed;
   logic [6:0] funct7;
   logic [2:0] funct3;
   logic [4:0] opHigh;
   logic [1:0] opLow ;
-  logic [4:0] rs1, rs2, rs3, rd;
+  logic [4:0] rs1, rs2, rd;
   logic [CPU_WIDTH-1:0] shamt, immItype, immStype, immBtype, immUtype, immJtype;
   always_comb begin
     {funct7,rs2,rs1,funct3,rd,opHigh,opLow} =ins;
-    rs3      = ins[31:27];
     immItype = unsigned'(type_Signed'({ins[31:20]}));
     immStype = unsigned'(type_Signed'({ins[31:25],ins[11:7]}));
     immBtype = unsigned'(type_Signed'({ins[31],ins[7],ins[30:25],ins[11:8],1'b0}));
@@ -48,15 +52,17 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
     f7_0100000  = f7h6_010000 & ~funct7[0];
   end
 
-  logic notRvc, bigImmInsFlg, bjInsFlg, jumpInsFlg, branchInsFlg, loadStoreInsFlg, loadInsFlg, storeInsFlg;
+  logic notRvc, bigImmInsFlg, opHigh_110xx, bjInsFlg, jumpInsFlg, branchInsFlg;
+  logic loadStoreInsFlg, loadInsFlg, storeInsFlg;
   logic intInsFlg, intImmInsFlg, intRs2InsFlg, wInsFLg;
   logic sysInsFlg, atomicInsFlg, fenceInsFlg;
   always_comb begin
     notRvc          = (opLow==2'b11);                  // whether it's RVC instructions. 0-RVC ins.  1-Not RVC ins.
     bigImmInsFlg    = (opHigh ==? 5'b0?101) & notRvc;  // big immediate operand instructions: LUI, AUIPC
-    bjInsFlg        = (opHigh ==  5'b110??) & (opHigh[1:0]!=2'b10) & notRvc;  // branch and jump instructions
-    jumpInsFlg      = bjInsFlg & opHigh[0]    ;        // jump instructions: JAL, JALR
-    branchInsFlg    = bjInsFlg & (opHigh[1:0]==2'b00); // branch instructions: BEQ, BNE, BLE[U], BGE[U]
+    opHigh_110xx    = (opHigh ==  5'b110??);           // the signal is used in branch and jump decode.
+    bjInsFlg        = opHigh_110xx & (opHigh[1:0]!=2'b10) & notRvc; // branch and jump instructions
+    jumpInsFlg      = opHigh_110xx & opHigh[0] & notRvc;            // jump instructions: JAL, JALR
+    branchInsFlg    = opHigh_110xx & (opHigh[1:0]==2'b00) & notRvc; // branch instructions: BEQ, BNE, BLE[U], BGE[U]
     loadStoreInsFlg = (opHigh ==? 5'b0?000) & notRvc;  // load & store : 00000 - int load , 01000 - int store
     loadInsFlg      = loadStoreInsFlg & ~opHigh[3];    // load instructions:  LB[U], LH[U], LW[U], LD
     storeInsFlg     = loadStoreInsFlg &  opHigh[3];    // store instructions: SB[U], SH[U], SW[U], SD
@@ -76,10 +82,10 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 
   logic jalFlg, jalrFlg, fenceIFlg, csrUimmFlg;
   always_comb begin
-    jalFlg     = jumpInsFlg  & ~opHigh[1];            // JAL 
-    jalrFlg    = jumpInsFlg  &  opHigh[1] &  f3Oh[0]; // JALR 
-    fenceIFlg  = fenceInsFlg &  f3Oh[0];              // FENCE.I
-    csrUimmFlg = sysInsFlg   &  funct3[2];            // csr instructions with uimm: CSRRWI, CSRRSI, CSRRCI
+    jalFlg     = jumpInsFlg  &  opHigh[1];           // JAL 
+    jalrFlg    = jumpInsFlg  & ~opHigh[1] & f3Oh[0]; // JALR 
+    fenceIFlg  = fenceInsFlg &  f3Oh[0];             // FENCE.I
+    csrUimmFlg = sysInsFlg   &  funct3[2];           // csr instructions with uimm: CSRRWI, CSRRSI, CSRRCI
   end
 
   logic rs1Enable, rs2Enable, rdEnable, insRtype, insItype, insStype, insBtype, insUtype, insJtype;
@@ -665,7 +671,7 @@ interface ZionRiscvIsaLib_AddSubExItf
   function automatic logic [CPU_WIDTH-1:0] Exec;
 
     logic [CPU_WIDTH-1:0] s1Tmp, s2Tmp, rsltTmp, result;
-    s1Tmp   = {$bits(s1){op[0]}} & s1;
+    s1Tmp   = {$bits(s1){op[0] & op[1]}} & s1;
     s2Tmp   =   ({$bits(s2){op[1]}} & ~s2)
               | ({$bits(s2){op[0]}} &  s2);
     rsltTmp = (s1Tmp + s2Tmp + op[1]);
@@ -927,36 +933,39 @@ interface ZionRiscvIsaLib_LoadExItf
     logic                  [7:0] byteLoadDat;
     logic                        byteMsb;
     logic [CPU_WIDTH-1  :0]      byteLoadRslt;
-    byteSplitDat = memDat;
-    byteLoadDat  = memDat[addr[$high(addr):0]];
-    byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
-    byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
     // LH
     logic [CPU_WIDTH/16-1:0][15:0] halfwordSplitDat;
     logic                   [15:0] halfwordLoadDat;
     logic                          halfwordMsb;
     logic [CPU_WIDTH-1   :0]       halfwordLoadRslt;
+    // LW
+    logic [CPU_WIDTH/32-1:0][31:0] wordSplitDat;
+    logic                   [31:0] wordLoadDat;
+    logic                          wordMsb;
+    logic [CPU_WIDTH-1   :0]       wordLoadRslt;
+    // LD
+    logic [CPU_WIDTH-1   :0] doubleLoadRslt;
+    // LB
+    byteSplitDat = memDat;
+    byteLoadDat  = byteSplitDat[addr[$high(addr):0]];
+    byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
+    byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
+    // LH
     halfwordSplitDat = memDat;
-    halfwordLoadDat  = memDat[addr[$high(addr):1]];
+    halfwordLoadDat  = halfwordSplitDat[addr[$high(addr):1]];
     halfwordExtend   = (~unsignedLoad) & halfwordLoadDat[$high(halfwordLoadDat)];
     halfwordLoadRslt = {CPU_WIDTH{loadEn[1]}} & {{(CPU_WIDTH-$bits(halfwordLoadDat)){halfwordExtend}}, halfwordLoadDat};
     `gen_if(RV64==0)begin
-      // LW
-      logic [CPU_WIDTH-1   :0] wordLoadRslt;
+      // LW for RV32
       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & memDat;
       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt;
     end `gen_elif(RV64==1)begin
-      // LW
-      logic [CPU_WIDTH/32-1:0][32:0] wordSplitDat;
-      logic                   [32:0] wordLoadDat;
-      logic                          wordMsb;
-      logic [CPU_WIDTH-1   :0]       wordLoadRslt;
+      // LW for RV64
       wordSplitDat = memDat;
-      wordLoadDat  = memDat[addr[$high(addr):2]];
+      wordLoadDat  = wordSplitDat[addr[$high(addr):2]];
       wordExtend   = (~unsignedLoad) & wordLoadDat[$high(wordLoadDat)];
       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & {{(CPU_WIDTH-$bits(wordLoadDat)){wordExtend}}, wordLoadDat};
-      //LD
-      logic [CPU_WIDTH-1   :0] doubleLoadRslt;
+      //LD for RV64
       doubleLoadRslt = {CPU_WIDTH{loadEn[3]}} & memDat;
       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt | doubleLoadRslt;
     end
@@ -1007,36 +1016,38 @@ interface ZionRiscvIsaLib_StoreExItf
     //SB
     logic [CPU_WIDTH/8-1:0][7:0] byteWrDat;
     logic [CPU_WIDTH/8-1:0]      byteWrEn;
+    //SH
+    logic [CPU_WIDTH/16-1:0][15:0] halfwordWrDat;
+    logic [CPU_WIDTH/16-1:0][ 1:0] halfwordWrEn;
+    //SW
+    logic [CPU_WIDTH/32-1:0][31:0] wordWrDat;
+    logic [CPU_WIDTH/32-1:0][ 3:0] wordWrEn;
+    //SD
+    logic [CPU_WIDTH/-1:0] doubleWrDat;
+    logic [           7:0] doubleWrEn;
+    //SB
     byteWrDat = '0;
     byteWrEn  = '0;
     byteWrDat[addr[$high(addr):0]] = {8{storeEn[0]}} & storeDat[0+:8];
     byteWrEn[addr[$high(addr):0]]  = storeEn[0];
     //SH
-    logic [CPU_WIDTH/16-1:0][15:0] halfwordWrDat;
-    logic [CPU_WIDTH/16-1:0][ 1:0] halfwordWrEn;
     halfwordWrDat = '0;
     halfwordWrEn  = '0;
     halfwordWrDat[addr[$high(addr):1]] = {16{storeEn[1]}} & storeDat[0+:16];
     halfwordWrEn[addr[$high(addr):1]]  = {2{storeEn[1]}};
     `gen_if(RV64==0) begin
-      //SW
-      logic [CPU_WIDTH/-1:0] wordWrDat;
-      logic [           3:0] wordWrEn;
+      //SW for RV32
       wordWrDat = {31storeEn[2]} & storeDat;
       wordWrEn  = {4{storeEn[2]}};
       wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | wordWrDat;
       wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | wordWrEn;
     end `gen_elif(RV64==1) begin
-      //SW
-      logic [CPU_WIDTH/32-1:0][32:0] wordWrDat;
-      logic [CPU_WIDTH/32-1:0][ 3:0] wordWrEn;
+      //SW for RV64
       wordWrDat = '0;
       wordWrEn  = '0;
       wordWrDat[addr[$high(addr):2]] = {32{storeEn[2]}} & storeDat[0+:32];
       wordWrEn[addr[$high(addr):2]]  = {4{storeEn[2]}};
-      //SD
-      logic [CPU_WIDTH/-1:0] doubleWrDat;
-      logic [           7:0] doubleWrEn;
+      //SD for RV64
       doubleWrDat = {31storeEn[3]} & storeDat;
       doubleWrEn  = {8{storeEn[3]}};
       wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | type_WrDat'(wordWrDat) | doubleWrDat;
@@ -1056,14 +1067,25 @@ endinterface: ZionRiscvIsaLib_StoreExItf
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_IntInsExItf
 // Author         : Wenheng Ma
-// Date           : 2019-08-02
+// Date           : 2019-08-14
 // Version        : 1.0
 // Description    :
-//   TODO
+//   To simplify the Execution module design, the library has a parameterized integer exicution module. This interface
+//   is used by the module to put all necessary signals together. 
+//   The interface has 3 types of modport:
+//     1. Modport for integer instructions excution with branch&jump and memory address calculate.
+//        In this kind of modport, the Int Excution module takes charge of:
+//          a) int instructions execution,  b) branch&jump instrucions execution,  c) memory address calculate
+//     2. Modport for integer instructions excution with branch&jump
+//        In this kind of modport, the Int Excution module takes charge of:
+//          a) int instructions execution,  b) branch&jump instrucions execution
+//     3. Modport for integer instructions excution without other actions
+//        In this kind of modport, the Int Excution module only takes charge of int instructions execution
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
 // Modification History:
 //   Date   |   Author   |   Version   |   Change Description
 //======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
+// 19-08-14 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 `ifndef Disable_ZionRiscvIsaLib_IntInsExItf
 interface ZionRiscvIsaLib_IntInsExItf
@@ -1071,7 +1093,7 @@ interface ZionRiscvIsaLib_IntInsExItf
 
   localparam CPU_WIDTH = 32*(RV64+1);
   logic [CPU_WIDTH-1:0] pc, s1, s2, offset;
-  logic [RV64:0] flags; // flags[0] - unsigned flag       flags[1] - .W flag
+  logic [RV64:0] flags; // flags[0] - unsigned flag       flags[1] - .W flag (only for RV64)
   logic addSubVld, addEn, subEn;
   logic andEn, orEn, xorEn;
   logic sltEn, bjEn, branch, beq, bne, blt, bge, jump, jal, jalr;
@@ -1116,7 +1138,30 @@ interface ZionRiscvIsaLib_IntInsExItf
 endinterface: ZionRiscvIsaLib_IntInsExItf
 `endif
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_IntEx
+// Author      : Wenheng Ma
+// Date        : 2019-08-14
+// Version     : 1.0
+// Description :
+//   Integer instructions execution module. The module has 3 types(indicated by INT_MODULE_TYPE):
+//     1. Int execution with branch&jump and memory address calculate. (INT_MODULE_TYPE == 0)
+//        In this type, the module reuse the adder for memory address calculation and Link PC. Besides it reuse the 
+//        sub for 'less than'(also for branch).
+//     2. Int execution with branch&jump. (INT_MODULE_TYPE == 1)
+//        In this type, the module reuse the adder for Link PC, and reuse the sub for 'less than'(also for branch).
+//     3. Int execution. (INT_MODULE_TYPE == 2)
+//        In this type, the module do not reuse anything. It has the best performance and the largest area.
+//   When instantiated the module, the interface connection must be indicated according to the INT_MODULE_TYPE. Because
+//   different module types has different signals and circuits.
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//   Date   |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 19-08-14 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+`ifndef Disable_ZionRiscvIsaLib_IntEx
 module ZionRiscvIsaLib_IntEx
 #(RV64 = 0,
   INT_MODULE_TYPE = 0
