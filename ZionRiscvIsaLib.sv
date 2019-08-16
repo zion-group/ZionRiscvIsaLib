@@ -938,38 +938,38 @@ interface ZionRiscvIsaLib_LoadExItf
     // LB 
     logic [CPU_WIDTH/8-1:0][7:0] byteSplitDat;
     logic                  [7:0] byteLoadDat;
-    logic                        byteMsb;
+    logic                        byteMsb,byteExtend;
     logic [CPU_WIDTH-1  :0]      byteLoadRslt;
     // LH
     logic [CPU_WIDTH/16-1:0][15:0] halfwordSplitDat;
     logic                   [15:0] halfwordLoadDat;
-    logic                          halfwordMsb;
+    logic                          halfwordMsb,halfwordExtend;
     logic [CPU_WIDTH-1   :0]       halfwordLoadRslt;
     // LW
     logic [CPU_WIDTH/32-1:0][31:0] wordSplitDat;
     logic                   [31:0] wordLoadDat;
-    logic                          wordMsb;
+    logic                          wordMsb,wordExtend;
     logic [CPU_WIDTH-1   :0]       wordLoadRslt;
     // LD
     logic [CPU_WIDTH-1   :0] doubleLoadRslt;
     // LB
     byteSplitDat = memDat;
-    byteLoadDat  = byteSplitDat[addr[$high(addr):0]];
+    byteLoadDat  = byteSplitDat[addr];//[addr[$high(addr):0]]
     byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
     byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
     // LH
     halfwordSplitDat = memDat;
-    halfwordLoadDat  = halfwordSplitDat[addr[$high(addr):1]];
+    halfwordLoadDat  = halfwordSplitDat[addr[$high(addr)]];//addr[$high(addr):1]
     halfwordExtend   = (~unsignedLoad) & halfwordLoadDat[$high(halfwordLoadDat)];
     halfwordLoadRslt = {CPU_WIDTH{loadEn[1]}} & {{(CPU_WIDTH-$bits(halfwordLoadDat)){halfwordExtend}}, halfwordLoadDat};
     `gen_if(RV64==0)begin
       // LW for RV32
       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & memDat;
       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt;
-    end `gen_elif(RV64==1)begin
+    end `gen_else begin//`gen_elif(RV64==1)
       // LW for RV64
       wordSplitDat = memDat;
-      wordLoadDat  = wordSplitDat[addr[$high(addr):2]];
+      wordLoadDat  = wordSplitDat[addr[$high(addr)]];//[addr[$high(addr):2]]
       wordExtend   = (~unsignedLoad) & wordLoadDat[$high(wordLoadDat)];
       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & {{(CPU_WIDTH-$bits(wordLoadDat)){wordExtend}}, wordLoadDat};
       //LD for RV64
