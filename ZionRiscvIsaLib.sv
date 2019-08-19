@@ -683,22 +683,21 @@ endinterface: ZionRiscvIsaLib_AddSubExItf
 `ifndef Disable_ZionRiscvIsaLib_AddSubExItf_Exec
 `ifdef MACRO_TEMPLATE
   `ifdef ZionRiscvIsaLib_AddSubExItf_Exec
-  `ifdef ZionRiscvIsaLib_AddSubExItf_Exec
     `__DefErr__(ZionRiscvIsaLib_AddSubExItf_Exec)
   `else
     `define ZionRiscvIsaLib_AddSubExItf_Exec(iDat_MT,oRslt_MT)\
-  ZionRiscvIsaLib_AddSubExItf_Exec U_iDatItf_Exec(iDat_MT,oRslt_MT);
+  ZionRiscvIsaLib_AddSubExItf_Exec#(iDat_MT.type_Dat) U_iDatItf_Exec(iDat_MT,oRslt_MT);
   `endif
 `endif
 
 module ZionRiscvIsaLib_AddSubExItf_Exec
-(
+#(type type_Dat = logic[31:0]
+)(
   ZionRiscvIsaLib_AddSubExItf.Ex iDat,
-  output iDat.type_Dat oRslt
+  output type_Dat oRslt
 );
 
-  typedef iDat.type_Dat type_Dat;
-  typedef iDat.Op type_Op;
+  typedef iDat.type_Op type_Op;
   type_Op op;
   type_Dat s1Tmp, s2Tmp, rsltTmp;
   always_comb begin
@@ -709,9 +708,9 @@ module ZionRiscvIsaLib_AddSubExItf_Exec
     rsltTmp = (s1Tmp + s2Tmp + op[1]);
   end
   `gen_if($bits(op)==3) begin
-    oRslt = (op[2]) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
+    assign oRslt = (op[2]) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
   end `gen_else begin
-    oRslt = rsltTmp;
+    assign oRslt = rsltTmp;
   end
 
 endmodule: ZionRiscvIsaLib_AddSubExItf_Exec
@@ -720,7 +719,6 @@ endmodule: ZionRiscvIsaLib_AddSubExItf_Exec
 
 `ifndef Disable_ZionRiscvIsaLib_AddSubExItf_LessThan
 `ifdef MACRO_TEMPLATE
-  `ifdef ZionRiscvIsaLib_AddSubExItf_LessThan
   `ifdef ZionRiscvIsaLib_AddSubExItf_LessThan
     `__DefErr__(ZionRiscvIsaLib_AddSubExItf_LessThan)
   `else
