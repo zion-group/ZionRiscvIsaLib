@@ -686,12 +686,14 @@ endinterface: ZionRiscvIsaLib_AddSubExItf
     `__DefErr__(ZionRiscvIsaLib_AddSubExItf_Exec)
   `else
     `define ZionRiscvIsaLib_AddSubExItf_Exec(iDat_MT,oRslt_MT)\
-  ZionRiscvIsaLib_AddSubExItf_Exec#(iDat_MT.type_Dat) U_iDatItf_Exec(iDat_MT,oRslt_MT);
+  localparam iDat_MT``_RV64 = iDat_MT.RV64;                   \
+  ZionRiscvIsaLib_AddSubExItf_Exec#(iDat_MT``_RV64) U_``iDat_MT``_Exec(iDat_MT,oRslt_MT);
   `endif
 `endif
 
 module ZionRiscvIsaLib_AddSubExItf_Exec
-#(type type_Dat = logic[31:0]
+#(RV64 = 0,
+localparam type logic [32*(RV64+1)] type_Dat
 )(
   ZionRiscvIsaLib_AddSubExItf.Ex iDat,
   output type_Dat oRslt
@@ -723,7 +725,7 @@ endmodule: ZionRiscvIsaLib_AddSubExItf_Exec
     `__DefErr__(ZionRiscvIsaLib_AddSubExItf_LessThan)
   `else
     `define ZionRiscvIsaLib_AddSubExItf_LessThan(iDat_MT,unsignedFlg_MT,cmpRsltSign_MT,oRslt_MT) \
-  ZionRiscvIsaLib_AddSubExItf_LessThan  U_iDatItf_LessThan(                                      \
+  ZionRiscvIsaLib_AddSubExItf_LessThan  U_``iDat_MT``_LessThan(                                  \
                                           .iDat(iDat_MT),                                        \
                                           .unsignedFlg(unsignedFlg_MT),                          \
                                           .cmpRsltSign(cmpRsltSign_MT),                          \
@@ -740,7 +742,7 @@ module ZionRiscvIsaLib_AddSubExItf_LessThan
   output logic oRslt
 );
 
-  always_comb
+  always_comb begin
     oRslt = iDat.LessThan(unsignedFlg,cmpRsltSign);
   end
 
