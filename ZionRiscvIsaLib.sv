@@ -694,7 +694,7 @@ endinterface: ZionRiscvIsaLib_AddSubExItf
 module ZionRiscvIsaLib_AddSubExItf_Exec
 (
   ZionRiscvIsaLib_AddSubExItf.Ex iDat,
-  output type_Dat oRslt
+  output iDat.type_Dat oRslt
 );
 
   typedef iDat.type_Dat type_Dat;
