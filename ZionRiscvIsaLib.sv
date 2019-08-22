@@ -689,14 +689,14 @@ endinterface: ZionRiscvIsaLib_AddSubExItf
   `ifdef VIVADO_SYN                                                       \
     localparam iDat_MT``_RV64_Exec = iDat_MT.RV64;                        \
   `else                                                                   \
-    localparam iDat_MT``_RV64_Exec = $bits(iDat_MT.op)-1;                 \
+    localparam iDat_MT``_RV64_Exec = $bits(iDat_MT.op)-2;                 \
   `endif                                                                  \
-  ZionRiscvIsaLib_AddSubExItf_Exec#(.RV64(iDat_MT``_RV64),                \
+  ZionRiscvIsaLib_AddSubExItf_Exec#(.RV64(iDat_MT``_RV64_Exec),           \
                                     .type_Cpu(type_``iDat_MT``_Dat_Exec)) \
                                   U_``iDat_MT``_Exec(                     \
                                     .iDat(iDat_MT),                       \
                                     .oRslt(oRslt_MT)                      \
-                                  );                                      \
+                                  );                                      
   `endif
 `endif
 module ZionRiscvIsaLib_AddSubExItf_Exec
