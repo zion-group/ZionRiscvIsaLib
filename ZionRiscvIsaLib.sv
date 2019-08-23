@@ -655,6 +655,7 @@ endinterface: ZionRiscvIsaLib_RvimazDecodeItf
 //   The interface could also be used to calculate the result of 'less than' compare by the LessThan function. 
 //     - 'less than' is used in 8 instructions: BLT[U], BGE[U], BLT[I][U]
 //   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+//   TODO: add descriptions for two modules.
 // Modification History:
 //   Date   |   Author   |   Version   |   Change Description
 //======================================================================================================================
@@ -679,78 +680,73 @@ interface  ZionRiscvIsaLib_AddSubExItf
 endinterface: ZionRiscvIsaLib_AddSubExItf
 `endif
 
-`ifndef Disable_ZionRiscvIsaLib_AddSubExItf_Exec
-`ifdef MACRO_TEMPLATE
-  `ifdef ZionRiscvIsaLib_AddSubExItf_Exec
-    `__DefErr__(ZionRiscvIsaLib_AddSubExItf_Exec)
-  `else
-    `define ZionRiscvIsaLib_AddSubExItf_Exec(iDat_MT,oRslt_MT)            \
-  typedef iDat_MT.type_Cpu type_``iDat_MT``_Dat_Exec;                     \
-  `ifdef VIVADO_SYN                                                       \
-    localparam iDat_MT``_RV64_Exec = iDat_MT.RV64;                        \
-  `else                                                                   \
-    localparam iDat_MT``_RV64_Exec = $bits(iDat_MT.op)-2;                 \
-  `endif                                                                  \
-  ZionRiscvIsaLib_AddSubExItf_Exec#(.RV64(iDat_MT``_RV64_Exec),           \
-                                    .type_Cpu(type_``iDat_MT``_Dat_Exec)) \
-                                  U_``iDat_MT``_Exec(                     \
-                                    .iDat(iDat_MT),                       \
-                                    .oRslt(oRslt_MT)                      \
-                                  );                                      
-  `endif
+`ifndef Disable_ZionRiscvIsaLib_AddSubExec
+`ifdef ZionRiscvIsaLib_AddSubExec
+  `__DefErr__(ZionRiscvIsaLib_AddSubExec)
+`else
+  `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT,oRslt_MT) \
+  `ifdef VIVADO_SYN                                                    \
+    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                  \
+  `else                                                                \
+    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.op)-2;           \
+  `endif                                                               \
+  typedef iAddSubExIf_MT.type_Cpu UnitName``type_Cpu;                  \
+  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64),                  \
+                              .type_Cpu(UnitName``type_Cpu))           \
+                            UnitName(                                  \
+                              .iAddSubExIf(iAddSubExIf_MT),            \
+                              .oRslt(oRslt_MT)                         \
+                            );                                      
 `endif
-module ZionRiscvIsaLib_AddSubExItf_Exec
+module ZionRiscvIsaLib_AddSubExec
 #(RV64 = 0,
   type type_Cpu = logic [31:0]
 )(
-  ZionRiscvIsaLib_AddSubExItf.Ex iDat,
+  ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
   output type_Cpu oRslt
 );
 
   type_Cpu s1Tmp, s2Tmp, rsltTmp;
   always_comb begin
-    s1Tmp   = {$bits(s1Tmp){iDat.op[0]|iDat.op[1]}} & iDat.s1;
-    s2Tmp   =   ({$bits(s2Tmp){iDat.op[1]}} & ~iDat.s2)
-              | ({$bits(s2Tmp){iDat.op[0]}} &  iDat.s2);
-    rsltTmp = (s1Tmp + s2Tmp + iDat.op[1]);
+    s1Tmp   = {$bits(s1Tmp){iAddSubExIf.op[0]|iAddSubExIf.op[1]}} & iAddSubExIf.s1;
+    s2Tmp   =   ({$bits(s2Tmp){iAddSubExIf.op[1]}} & ~iAddSubExIf.s2)
+              | ({$bits(s2Tmp){iAddSubExIf.op[0]}} &  iAddSubExIf.s2);
+    rsltTmp = (s1Tmp + s2Tmp + iAddSubExIf.op[1]);
   end
   `gen_if(RV64) begin
-    assign oRslt = (iDat.op[2]) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
+    assign oRslt = (iAddSubExIf.op[2]) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
   end `gen_else begin
     assign oRslt = rsltTmp;
   end
 
-endmodule: ZionRiscvIsaLib_AddSubExItf_Exec
+endmodule: ZionRiscvIsaLib_AddSubExec
 `endif
 
-`ifndef Disable_ZionRiscvIsaLib_AddSubExItf_LessThan
-`ifdef MACRO_TEMPLATE
-  `ifdef ZionRiscvIsaLib_AddSubExItf_LessThan
-    `__DefErr__(ZionRiscvIsaLib_AddSubExItf_LessThan)
-  `else
-    `define ZionRiscvIsaLib_AddSubExItf_LessThan(iDat_MT,unsignedFlg_MT,cmpRsltSign_MT,oRslt_MT) \
-  ZionRiscvIsaLib_AddSubExItf_LessThan  U_``iDat_MT``_LessThan(                                  \
-                                          .iDat(iDat_MT),                                        \
-                                          .unsignedFlg(unsignedFlg_MT),                          \
-                                          .cmpRsltSign(cmpRsltSign_MT),                          \
-                                          .oRslt(oRslt_MT)                                       \
-                                        );
-  `endif
+`ifndef Disable_ZionRiscvIsaLib_AddSubLessThan
+`ifdef ZionRiscvIsaLib_AddSubLessThan
+  `__DefErr__(ZionRiscvIsaLib_AddSubLessThan)
+`else
+  `define ZionRiscvIsaLib_AddSubLessThan(UnitName,iAddSubExIf_MT,unsignedFlg_MT,cmpRsltSign_MT,oLessThan_MT) \
+  ZionRiscvIsaLib_AddSubLessThan  UnitName(                                                                  \
+                                    .iAddSubExIf(iAddSubExIf_MT),                                            \
+                                    .unsignedFlg(unsignedFlg_MT),                                            \
+                                    .cmpRsltSign(cmpRsltSign_MT),                                            \
+                                    .oLessThan(oLessThan_MT)                                                 \
+                                  );
 `endif
-
-module ZionRiscvIsaLib_AddSubExItf_LessThan
+module ZionRiscvIsaLib_AddSubLessThan
 (
-  ZionRiscvIsaLib_AddSubExItf.Ex iDat,
+  ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
   input unsignedFlg, 
   input cmpRsltSign,
-  output logic oRslt
+  output logic oLessThan
 );
 
   always_comb begin
-    oRslt = iDat.LessThan(unsignedFlg,cmpRsltSign);
+    oLessThan = iAddSubExIf.LessThan(unsignedFlg,cmpRsltSign);
   end
 
-endmodule: ZionRiscvIsaLib_AddSubExItf_LessThan
+endmodule: ZionRiscvIsaLib_AddSubLessThan
 `endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -775,21 +771,45 @@ interface ZionRiscvIsaLib_BitsExItf
 #(RV64 = 0);
 
   localparam CPU_WIDTH = 32*(RV64+1);
+  typedef logic [CPU_WIDTH-1:0] type_Cpu;
   logic andEn, orEn, xorEn;
-  logic [CPU_WIDTH-1:0] s1,s2;
-
-  function automatic logic [CPU_WIDTH-1:0] Exec;
-    return (({$bits(s1){andEn}} & (s1 & s2)) |
-            ({$bits(s1){orEn }} & (s1 | s2)) |
-            ({$bits(s1){xorEn}} & (s1 ^ s2)) );
-  endfunction: Exec
+  type_Cpu s1,s2;
 
   modport De (output andEn, orEn, xorEn, s1, s2);
-  modport Ex (input  andEn, orEn, xorEn, s1, s2, import Exec);
+  modport Ex (input  andEn, orEn, xorEn, s1, s2);
 
 endinterface: ZionRiscvIsaLib_BitsExItf
 `endif
 
+`ifndef Disable_ZionRiscvIsaLib_BitsOpExec
+`ifdef ZionRiscvIsaLib_BitsOpExec
+  `__DefErr__(ZionRiscvIsaLib_BitsOpExec)
+`else
+  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT,oRslt_MT) \
+  typedef iBitsExif_MT.type_Cpu UnitName_``type_Cpu;                 \
+  ZionRiscvIsaLib_BitsOpExec#(.type_Cpu(UnitName_``type_Cpu))        \
+                                UnitName(                            \
+                                  .iBitsExif(iBitsExif_MT),          \
+                                  .oRslt(oRslt_MT)                   \
+                                );
+`endif
+module ZionRiscvIsaLib_BitsOpExec
+#(type type_Cpu = logic [31:0]
+)(
+  ZionRiscvIsaLib_BitsExItf.Ex iBitsExif,
+  output type_Cpu oRslt
+);
+
+  type_Cpu andRslt, orRslt, xorRslt;
+  always_comb begin
+    andRslt = {$bits(oRslt){iBitsExif.andEn}} & (iBitsExif.s1 & iBitsExif.s2);
+    orRslt  = {$bits(oRslt){iBitsExif.orEn }} & (iBitsExif.s1 | iBitsExif.s2);
+    xorRslt = {$bits(oRslt){iBitsExif.xorEn}} & (iBitsExif.s1 ^ iBitsExif.s2);
+    oRslt   = andRslt | orRslt | xorRslt;
+  end
+
+endmodule: ZionRiscvIsaLib_BitsOpExec
+`endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_BjExItf
@@ -821,41 +841,142 @@ interface ZionRiscvIsaLib_BjExItf
   logic bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, jal, jalr;
   logic [CPU_WIDTH-1:0] pc, s1, s2, offset;
 
-  function automatic logic [CPU_WIDTH-1:0] TgtAddr;
-    logic [CPU_WIDTH-1:0] baseAddr, tgtOffset, bjTgt;
-    baseAddr  = ({$bits(s1){(branch|jal)}}& pc) | ({$bits(s1){jalr}} & s1);
-    tgtOffset = {$bits(s2){bjEn}} & offset;
-    bjTgt     = baseAddr + tgtOffset;
-    return bjTgt;
-  endfunction:TgtAddr
-
-  function automatic logic [1:0] BjEnReuse(input bltRslt); 
-    logic equal;
-    logic [1:0] bjFlg;
-    equal    = (s1 == s2);
-    bjFlg[1] = jump | (beq & equal) | (bne & !equal);
-    bjFlg[0] = (blt & bltRslt) | (bge & !bltRslt);
-    return bjFlg;
-  endfunction: BjEnReuse
-
-  function automatic logic [1:0] BjEnStandby;
+  function automatic logic LessThan;
     logic signed [CPU_WIDTH:0] s1Tmp, s2Tmp;
     logic lessThan;
     s1Tmp = {{(~unsignedFlg) & s1[$high(s1)]} , s1};
     s2Tmp = {{(~unsignedFlg) & s2[$high(s2)]} , s2};
     lessThan = (s1Tmp<s2Tmp)? 1'b1:1'b0;
-    return BjEnReuse(lessThan);
-  endfunction: BjEnStandby
+    return lessThan;
+  endfunction: LessThan
 
-  function automatic logic [CPU_WIDTH-1:0] LinkPc;
-    logic [CPU_WIDTH-1:0] plus4;
-    plus4 = signed'('d4);  //TBD
-    return (({$bits(pc){jump}} & pc) + ({$bits(plus4){jump}} & plus4));
-  endfunction: LinkPc
-  
-  modport De (output bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, jal, jalr,pc, s1, s2, offset);
-  modport Ex (input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, jal, jalr,pc, s1, s2, offset, import TgtAddr, BjEnReuse, BjEnStandby, LinkPc);
+  modport De( output bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, jal, jalr,pc, s1, s2, offset);
+  modport Ex( input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, jal, jalr,pc, s1, s2, offset,
+              import LessThan
+            );
 endinterface: ZionRiscvIsaLib_BjExItf
+`endif
+
+`ifndef Disable_ZionRiscvIsaLib_BjTgtAddr
+`ifdef ZionRiscvIsaLib_BjTgtAddr
+  `__DefErr__(ZionRiscvIsaLib_BjTgtAddr)
+`else
+  `define ZionRiscvIsaLib_BjTgtAddr(UnitName,iBjExIf_MT,oTgtAddr_MT) \
+  typedef iBjExIf_MT.type_Cpu UnitName``_type_Cpu;                   \
+  ZionRiscvIsaLib_BjTgtAddr#(.type_Cpu(UnitName``_type_Cpu))         \
+                            UnitName(                                \
+                              .iBjExIf(iBjExIf_MT),                  \
+                              .oTgtAddr(oTgtAddr_MT)                 \
+                            );
+`endif
+module ZionRiscvIsaLib_BjTgtAddr
+#(type type_Cpu = logic [31:0]
+)(
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
+  output type_Cpu            oTgtAddr
+);
+  type_Cpu baseAddr, tgtOffset;
+  always_comb begin
+    baseAddr  =  ({$bits(oTgtAddr){(iBjExIf.branch|iBjExIf.jal)}} & iBjExIf.pc) 
+                |({$bits(oTgtAddr){iBjExIf.jalr}}              & iBjExIf.s1);
+    tgtOffset = {$bits(oTgtAddr){iBjExIf.bjEn}} & iBjExIf.offset;
+    oTgtAddr  = baseAddr + tgtOffset;
+  end
+
+endmodule: ZionRiscvIsaLib_BjTgtAddr
+`endif
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_BjEnNoLt
+`ifdef ZionRiscvIsaLib_BjEnNoLt
+  `__DefErr__(ZionRiscvIsaLib_BjEnNoLt)
+`else
+  `define ZionRiscvIsaLib_BjEnNoLt(UnitName,iBjExIf_MT,iLessThan_MT,oBjEn_MT) \
+  ZionRiscvIsaLib_BjEnNoLt  UnitName(                                         \
+                              .iBjExIf(iBjExIf_MT),                           \
+                              .iLessThan(iLessThan)                           \
+                              .oBjEn(oBjEn_MT)                                \
+                            );
+`endif
+module ZionRiscvIsaLib_BjEnNoLt
+(
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
+  input                      iLessThan
+  output logic [1:0]         oBjEn
+);
+
+  logic equal;
+  always_comb begin
+    equal    = (iBjExIf.s1 == iBjExIf.s2);
+    oBjEn[1] = iBjExIf.jump | (iBjExIf.beq & iBjExIf.equal) | (iBjExIf.bne & !iBjExIf.equal);
+    oBjEn[0] = (iBjExIf.blt & iLessThan) | (iBjExIf.bge & !iLessThan);
+  end
+
+endmodule: ZionRiscvIsaLib_BjEnNoLt
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+`ifndef Disable_ZionRiscvIsaLib_BjEnStandby
+`ifdef ZionRiscvIsaLib_BjEnStandby
+  `__DefErr__(ZionRiscvIsaLib_BjEnStandby)
+`else
+  `define ZionRiscvIsaLib_BjEnStandby(UnitName,iBjExIf_MT,oBjEn_MT) \
+  ZionRiscvIsaLib_BjEnStandby UnitName(                             \
+                                .iBjExIf(iBjExIf_MT),               \
+                                .oBjEn(oBjEn_MT)                    \
+                              );
+`endif
+module ZionRiscvIsaLib_BjEnStandby
+(
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
+  output logic [1:0]         oBjEn
+);
+
+  logic lessThan;
+  always_comb begin
+    lessThan = iBjExIf.LessThan();
+  end
+  ZionRiscvIsaLib_BjEnNoLt  U_ZionRiscvIsaLib_BjEnNoLt(
+                              .iBjExIf,
+                              .iLessThan(lessThan),
+                              .oBjEn
+                            );
+
+endmodule: ZionRiscvIsaLib_BjEnStandby
+`endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+`ifndef Disable_ZionRiscvIsaLib_JumpLinkPc
+`ifdef ZionRiscvIsaLib_JumpLinkPc
+  `__DefErr__(ZionRiscvIsaLib_JumpLinkPc)
+`else
+  `define ZionRiscvIsaLib_JumpLinkPc(UnitName,iBjExIf_MT,oLinkPc_MT) \
+  typedef iBjExIf_MT.type_Cpu UnitName``_type_Cpu;                   \
+  ZionRiscvIsaLib_JumpLinkPc  #(.type_Cpu(UnitName``_type_Cpu))      \
+                              UnitName(                              \
+                                .iBjExIf(iBjExIf_MT),                \
+                                .oLinkPc(oLinkPc_MT)                 \
+                              );
+`endif
+module ZionRiscvIsaLib_JumpLinkPc
+#(type type_Cpu = logic [31:0]
+)(
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
+  output type_Cpu oLinkPc
+);
+
+  logic [$bits(oLinkPc-2):0] pcHigh;
+  always_comb begin
+    pcHigh = iBjExIf.pc[$high(oLinkPc):2];
+    oLinkPc[$high(oLinkPc):2] = {$bits(pcHigh)){iBjExIf.jump}} & pcHigh} + iBjExIf.jump;
+    oLinkPc[1:0] = pc[1:0];
+  end
+
+endmodule: ZionRiscvIsaLib_JumpLinkPc
 `endif
 
 
@@ -887,40 +1008,72 @@ interface ZionRiscvIsaLib_SftExItf
   logic [CPU_WIDTH-1:0] s1,sftRslt;
   logic [4+RV64:0]      s2;
 
-  function automatic logic [CPU_WIDTH-1:0] Exec;
-
-    logic [CPU_WIDTH-1:0] s1W, s1Tmp, s1Reverse,sftRslt,rsltReverse,rsltReverseW;
-    s1Reverse = {<<{s1}}; 
-    `gen_if(RV64==0) 
-    s1W = s1;
-    `gen_else
-    begin
-    s1W = {((op[2+RV64])? {32{op[2]&s1[31]}} : s1[32*RV64+31:32*RV64]) , s1[31:0]};
-    //s1W = {((op[3])? {32{op[2]&s1[31]}} : s1[63:32]) , s1[31:0]};
-    end
-    s1Tmp =  ({$bits(s1){op[0]}} & s1Reverse)
-            |({$bits(s1){op[1]}} & s1W);
-            
-
-    sftRslt = {{$bits(s1){(op[2] & s1Tmp[$high(s1Tmp)])}},s1Tmp} >> s2;
-    rsltReverse  = {<<{sftRslt}};
-    `gen_if(RV64) 
-      rsltReverseW = signed'(rsltReverse[31:0]);
-    `gen_else
-      //rsltReverseW =op[2]? rsltReverse[31:0]:rsltReverse[63:32];
-      rsltReverseW = rsltReverse[31:0];
-    return ((op[0])? rsltReverseW : sftRslt);
-
-  endfunction: Exec
-
   modport De (output op, s1, s2);
-  modport Ex (input  op, s1, s2, import Exec);
+  modport Ex (input  op, s1, s2);
 always_comb begin 
   sftRslt = Exec();
 end
 endinterface: ZionRiscvIsaLib_SftExItf
 `endif
 
+
+`ifndef Disable_ZionRiscvIsaLib_SftExec
+`ifdef ZionRiscvIsaLib_SftExec
+  `__DefErr__(ZionRiscvIsaLib_SftExec)
+`else
+  `define ZionRiscvIsaLib_SftExec(UnitName,iSftExIf_MT,oRslt_MT) \
+  `ifdef VIVADO_SYN                                              \
+    localparam UnitName``_RV64 = iSftExIf_MT.RV64;               \
+  `else                                                          \
+    localparam UnitName``_RV64 = $bits(iSftExIf_MT.op)-2;        \
+  `endif                                                         \
+  typedef iSftExIf_MT.type_Cpu UnitName``type_Cpu;               \
+  ZionRiscvIsaLib_SftExec #(.RV64(UnitName``_RV64),              \
+                            .type_Cpu(UnitName_``type_Cpu))      \
+                          UnitName(                              \
+                            .iSftExIf(iSftExIf_MT),              \
+                            .oRslt(oRslt_MT)                     \
+                          );
+`endif
+module ZionRiscvIsaLib_SftExec
+#(RV64 = 0,
+type type_Cpu = logic [31:0]
+)(
+  Disable_ZionRiscvIsaLib_SftExItf.Ex iSftExIf,
+  output type_Cpu oRslt
+);
+
+  logic sftL, sftR, sftA, sftW;
+  assign sftL = iSftExIf.op[0];
+  assign sftR = iSftExIf.op[1];
+  assign sftA = iSftExIf.op[2];
+  `gen_if(RV64)begin
+    assign sftW = iSftExIf.op[3];
+  end
+
+  type_Cpu s1W, s1Tmp, s1Reverse,sftRslt,rsltReverse,rsltReverseW;
+  localparam DAT_WIDTH = $bits(type_Cpu);
+  assign s1Reverse = {<<{iSftExIf.s1}}; 
+  `gen_if(RV64) begin
+    assign s1W = {((sftW)? {32{sftA & iSftExIf.s1[31]}} : iSftExIf.s1[63:32]) , iSftExIf.s1[31:0]};
+  end `gen_else begin
+    assign s1W = iSftExIf.s1;
+  end
+  assign s1Tmp = ({DAT_WIDTH{sftL}} & s1Reverse)
+                |({DAT_WIDTH{sftR}} & s1W      );
+
+  assign sftRslt = {{DAT_WIDTH{(sftA & s1Tmp[DAT_WIDTH-1])}},s1Tmp} >> s2;
+  assign rsltReverse  = {<<{sftRslt}};
+  `gen_if(RV64) begin
+    assign rsltReverseW = signed'(rsltReverse[31:0]);
+  end `gen_else begin
+    assign rsltReverseW = rsltReverse[31:0];
+  end
+  
+  assign oRslt = (sftL)? rsltReverseW : sftRslt;
+
+endmodule: ZionRiscvIsaLib_SftExec
+`endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_SltExItf
@@ -961,6 +1114,29 @@ interface ZionRiscvIsaLib_SltExItf
 endinterface: ZionRiscvIsaLib_SltExItf
 `endif
 
+
+`ifndef Disable_ZionRiscvIsaLib_SetLessThan
+`ifdef ZionRiscvIsaLib_SetLessThan
+  `__DefErr__(ZionRiscvIsaLib_SetLessThan)
+`else
+  `define ZionRiscvIsaLib_SetLessThan(UnitName,iSltExIf_MT,oLessThan_MT) \
+  ZionRiscvIsaLib_SetLessThan UnitName(                                  \
+                                .iSltExIf(iSltExIf_MT),                  \
+                                .oLessThan(oLessThan_MT)                 \
+                              );
+`endif
+module ZionRiscvIsaLib_SetLessThan
+(
+  ZionRiscvIsaLib_SltExItf.Ex iSltExIf,
+  output logic oLessThan
+);
+
+  always_comb begin
+    oLessThan = iSltExIf.Exec();
+  end
+
+endmodule: ZionRiscvIsaLib_SetLessThan
+`endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_LoadExItf
@@ -1227,9 +1403,8 @@ endinterface: ZionRiscvIsaLib_IntInsExItf
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 module ZionRiscvIsaLib_IntEx
-#( parameter
-   RV64 = 0,
-   INT_MODULE_TYPE = 0
+#(RV64 = 0,
+  INT_MODULE_TYPE = 0
 )(
   ZionRiscvIsaLib_IntInsExItf iDat,
   ZionRiscvIsaLib_IntInsExItf oDat
@@ -1250,25 +1425,26 @@ module ZionRiscvIsaLib_IntEx
     BitsIf.xorEn = iDat.xorEn;
     BitsIf.s1    = iDat.s1;
     BitsIf.s2    = iDat.s2;
-    bitsRslt     = BitsIf.Exec();
 
     SftIf.op[0]  = iDat.sftLeft;
     SftIf.op[1]  = iDat.sftRight;
     SftIf.op[2]  = iDat.sftA;
     SftIf.s1     = iDat.s1;
     SftIf.s2     = iDat.s2;
-    sftRslt      = SftIf.Exec();
 
     AddSubIf.op[3] = RV64?iDat.flags[RV64]:0;
     AddSubIf.op[0] = iDat.addEn;
     AddSubIf.op[1] = iDat.subEn;
     AddSubIf.s1    = iDat.s1;
     AddSubIf.s2    = iDat.s2;
-    addSubRslt     = AddSubIf.Exec();
 
     memEn = iDat.memEn;
     addSubVld = iDat.addSubVld;
   end
+
+  `ZionRiscvIsaLib_BitsOpExec(U_BitsOpExec, BitsIf  , bitsRslt  );
+  `ZionRiscvIsaLib_SftExec   (U_SftExec   , SftIf   , sftRslt   );
+  `ZionRiscvIsaLib_AddSubExec(U_AddSubExec, AddSubIf, addSubRslt);
 
   `gen_if(RV64) begin
     always_comb begin
@@ -1295,12 +1471,15 @@ module ZionRiscvIsaLib_IntEx
       BjIf.s2          = iDat.s2;
       BjIf.offset      = iDat.offset;
 
-      sltRslt    = AddSubIf.LessThan(unsignedFlg, addSubRslt[$high(addSubRslt)]);
       oDat.intRslt = bitsRslt  | ({$bits(addSubRslt){addSubVld}} & addSubRslt) 
                     |sftRslt   | {{(CPU_WIDTH-1){1'b0}},{sltRslt & iDat.sltEn}};
-      oDat.BjEn  = BjIf.BjEnReuse(sltRslt);
-      oDat.BjTgt = BjIf.TgtAddr();
     end
+    `ZionRiscvIsaLib_AddSubLessThan(U_AddSubLessThan,
+                                      AddSubIf, unsignedFlg, addSubRslt[$high(addSubRslt)],
+                                      sltRslt
+                                    );
+    `ZionRiscvIsaLib_BjEnNoLt (U_BjEnNoLt , BjIf, sltRslt, oDat.BjEn );
+    `ZionRiscvIsaLib_BjTgtAddr(U_BjTgtAddr, BjIf,          oDat.BjTgt);
     `gen_if(INT_MODULE_TYPE==0) 
         assign oDat.memAddr = (memEn)? addSubRslt : '0;
   end
@@ -1311,9 +1490,9 @@ module ZionRiscvIsaLib_IntEx
       SltIf.unsignedFlg = unsignedFlg;
       SltIf.s1 = iDat.s1;
       SltIf.s2 = iDat.s2;
-      sltRslt           = SltIf.Exec();
       oDat.intRslt = bitsRslt | sftRslt | addSubRslt | {{(CPU_WIDTH-1){1'b0}},{sltRslt}};
     end
+    `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf,sltRslt);
   end
 
 endmodule: ZionRiscvIsaLib_IntEx
