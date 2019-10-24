@@ -642,68 +642,6 @@ endinterface: ZionRiscvIsaLib_RvimazDecodeItf
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Interface name : ZionRiscvIsaLib_BitsExItf
-// Author         : Wenheng Ma
-// Date           : 2019-08-02
-// Version        : 1.0
-// Description    :
-//   Define signals that bit operation ISA nead. And offer an Excution function to get the bit operation result.
-//   Bit operation contains 6 instructions: AND/ANDI, OR/ORI, XOR/XORI.
-//   Note that, for efficient architecture design, some other instructions could convert to bit operation. For example,
-//   LUI only place a U-type immediate into the highest bit of regfile. Thus the fixed shift could be done in Decode,
-//   and do an 'or' operation with 0.
-//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
-// Modification History:
-//   Date   |   Author   |   Version   |   Change Description
-//======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-`ifndef Disable_ZionRiscvIsaLib_BitsExItf
-interface ZionRiscvIsaLib_BitsExItf
-#(RV64 = 0);
-
-  localparam CPU_WIDTH = 32*(RV64+1);
-  typedef logic [CPU_WIDTH-1:0] type_Cpu;
-  logic andEn, orEn, xorEn;
-  type_Cpu s1,s2;
-
-  modport De (output andEn, orEn, xorEn, s1, s2);
-  modport Ex (input  andEn, orEn, xorEn, s1, s2);
-
-endinterface: ZionRiscvIsaLib_BitsExItf
-`endif
-
-`ifndef Disable_ZionRiscvIsaLib_BitsOpExec
-`ifdef ZionRiscvIsaLib_BitsOpExec
-  `__DefErr__(ZionRiscvIsaLib_BitsOpExec)
-`else
-  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT,oRslt_MT) \
-  typedef iBitsExif_MT.type_Cpu UnitName_``type_Cpu;                 \
-  ZionRiscvIsaLib_BitsOpExec#(.type_Cpu(UnitName_``type_Cpu))        \
-                                UnitName(                            \
-                                  .iBitsExif(iBitsExif_MT),          \
-                                  .oRslt(oRslt_MT)                   \
-                                );
-`endif
-module ZionRiscvIsaLib_BitsOpExec
-#(type type_Cpu = logic [31:0]
-)(
-  ZionRiscvIsaLib_BitsExItf.Ex iBitsExif,
-  output type_Cpu oRslt
-);
-
-  type_Cpu andRslt, orRslt, xorRslt;
-  always_comb begin
-    andRslt = {$bits(oRslt){iBitsExif.andEn}} & (iBitsExif.s1 & iBitsExif.s2);
-    orRslt  = {$bits(oRslt){iBitsExif.orEn }} & (iBitsExif.s1 | iBitsExif.s2);
-    xorRslt = {$bits(oRslt){iBitsExif.xorEn}} & (iBitsExif.s1 ^ iBitsExif.s2);
-    oRslt   = andRslt | orRslt | xorRslt;
-  end
-
-endmodule: ZionRiscvIsaLib_BitsOpExec
-`endif
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_BjExItf
 // Author         : Wenheng Ma
 // Date           : 2019-08-02
