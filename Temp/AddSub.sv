@@ -21,9 +21,9 @@
 //     - 'less than' is used in 8 instructions: BLT[U], BGE[U], BLT[I][U]
 //   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
 // Modification History:
-//   Date   |   Author   |   Version   |   Change Description
+//    Date    |   Author   |   Version   |   Change Description
 //======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 `ifndef Disable_ZionRiscvIsaLib_AddSubExItf
 interface  ZionRiscvIsaLib_AddSubExItf
@@ -57,9 +57,9 @@ endinterface : ZionRiscvIsaLib_AddSubExItf
 //     op[0] = add,     op[1] = sub,      op[2] = .W (only for R64I)
 //   Note that, add and sub can be activated at the same time. That will lead to an undefined result.
 // Modification History:
-//   Date   |   Author   |   Version   |   Change Description
+//    Date    |   Author   |   Version   |   Change Description
 //======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 `ifndef Disable_ZionRiscvIsaLib_AddSubExec
@@ -105,7 +105,7 @@ module ZionRiscvIsaLib_AddSubExec
   // Only one kind of operation can be done in a certain cycle. If both of addEn(iAddSubExIf.op[0])
   // and subEn(iAddSubExIf.op[1]) is 1, the result will be undifined and lead to an error. So it is
   // necessary to assert the situation.
-  assert(addEn & subEn) error("Signal Error: Both addEn and subEn are activated which only one could work.");
+  assert(addEn & subEn) error("Signal Error: Both addEn and subEn are both activated which only one could work.");
 
 endmodule : ZionRiscvIsaLib_AddSubExec
 `endif
@@ -121,9 +121,9 @@ endmodule : ZionRiscvIsaLib_AddSubExec
 //   Less than operation could convert to a subtraction. So it can reuse the ZionRiscvIsaLib_AddSubExec module.
 //   When use the subtractor, we need to deal with the unsigned less than operation which is done by this module.
 // Modification History:
-//   Date   |   Author   |   Version   |   Change Description
+//    Date    |   Author   |   Version   |   Change Description
 //======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 `ifndef Disable_ZionRiscvIsaLib_AddSubLessThan
