@@ -34,9 +34,9 @@ interface  ZionRiscvIsaLib_AddSubExItf
   logic [CPU_WIDTH-1:0] s1,s2,rslt;
 
   // TODO: add comments
-  function automatic logic LessThan(input unsignedFlg, cmpRsltSign); 
-    return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
-  endfunction : LessThan
+  //function automatic logic LessThan(input unsignedFlg, cmpRsltSign); 
+  //  return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
+  //endfunction : LessThan
 
   modport De (output op, s1, s2);
   modport Ex (input  op, s1, s2, output rslt, import LessThan);
@@ -66,15 +66,15 @@ endinterface : ZionRiscvIsaLib_AddSubExItf
 `ifdef ZionRiscvIsaLib_AddSubExec
   `__DefErr__(ZionRiscvIsaLib_AddSubExec)
 `else
-  `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT)  \
-`ifdef VIVADO_SYN                                              \
-    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;          \
-  `else                                                        \
-    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.op)-2;   \
-  `endif                                                       \
-  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64))          \
-                            UnitName(                          \
-                              .iAddSubExIf(iAddSubExIf_MT)     \
+  `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT)   \
+`ifdef VIVADO_SYN                                               \
+    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;           \
+  `else                                                         \
+    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1; \
+  `endif                                                        \
+  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64))           \
+                            UnitName(                           \
+                              .iAddSubExIf(iAddSubExIf_MT)      \
                             )
 `endif
 module ZionRiscvIsaLib_AddSubExec
@@ -105,7 +105,11 @@ module ZionRiscvIsaLib_AddSubExec
   // Only one kind of operation can be done in a certain cycle. If both of addEn(iAddSubExIf.op[0])
   // and subEn(iAddSubExIf.op[1]) is 1, the result will be undifined and lead to an error. So it is
   // necessary to assert the situation.
-  assert(addEn & subEn) error("Signal Error: Both addEn and subEn are both activated which only one could work.");
+  always_comb begin
+    assert($onehot0({addEn, subEn})) begin 
+      error("Signal Error: Both addEn and subEn are both activated which only one could work.");
+    end
+  end
 
 endmodule : ZionRiscvIsaLib_AddSubExec
 `endif
@@ -131,7 +135,13 @@ endmodule : ZionRiscvIsaLib_AddSubExec
   `__DefErr__(ZionRiscvIsaLib_AddSubLessThan)
 `else
   `define ZionRiscvIsaLib_AddSubLessThan(UnitName,iAddSubExIf_MT,unsignedFlg_MT,cmpRsltSign_MT,oLessThan_MT) \
-ZionRiscvIsaLib_AddSubLessThan  UnitName(                                                                    \
+`ifdef VIVADO_SYN                                                                                            \
+    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                                                        \
+  `else                                                                                                      \
+    localparam UnitName``_RV64 = UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;                            \
+  `endif                                                                                                     \
+  ZionRiscvIsaLib_AddSubLessThan  #(.RV64(UnitName``_RV64))                                                  \
+                                  UnitName(                                                                  \
                                     .iAddSubExIf(iAddSubExIf_MT),                                            \
                                     .unsignedFlg(unsignedFlg_MT),                                            \
                                     .cmpRsltSign(cmpRsltSign_MT),                                            \
@@ -139,15 +149,21 @@ ZionRiscvIsaLib_AddSubLessThan  UnitName(                                       
                                   )
 `endif
 module ZionRiscvIsaLib_AddSubLessThan
-(
+#(RV64=0
+)(
   ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
-  input unsignedFlg,
-  input cmpRsltSign,
+  input iUnsignedFlg,
+  input iCmpRsltSign,
   output logic oLessThan
 );
 
+  localparam HIGH_BIT = 32*(RV64+1)-1;
   always_comb begin
-    oLessThan = iAddSubExIf.LessThan(unsignedFlg,cmpRsltSign);
+    if((iUnsignedFlg && (iAddSubExIf.s1[HIGH_BIT] ^ iAddSubExIf.s2[HIGH_BIT])) begin
+      oLessThan = iAddSubExIf.s2[HIGH_BIT];
+    end else begin
+      oLessThan = iCmpRsltSign;
+    end
   end
 
 endmodule : ZionRiscvIsaLib_AddSubLessThan
