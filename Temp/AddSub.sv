@@ -40,7 +40,7 @@ interface  ZionRiscvIsaLib_AddSubExItf
 
   modport De (output op, s1, s2);
   modport Ex (input  op, s1, s2, output rslt);
-  modport LessThan (input s1, s2, import LessThan);
+  modport LessThan (input s1, s2, import AddSubLessThan);
 
 endinterface : ZionRiscvIsaLib_AddSubExItf
 `endif
@@ -135,37 +135,22 @@ endmodule : ZionRiscvIsaLib_AddSubExec
 `ifdef ZionRiscvIsaLib_AddSubLessThan
   `__DefErr__(ZionRiscvIsaLib_AddSubLessThan)
 `else
-  `define ZionRiscvIsaLib_AddSubLessThan(UnitName,iAddSubExIf_MT,unsignedFlg_MT,cmpRsltSign_MT,oLessThan_MT) \
-`ifdef VIVADO_SYN                                                                                            \
-    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                                                        \
-  `else                                                                                                      \
-    localparam UnitName``_RV64 = UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;                            \
-  `endif                                                                                                     \
-  ZionRiscvIsaLib_AddSubLessThan  #(.RV64(UnitName``_RV64))                                                  \
-                                  UnitName(                                                                  \
-                                    .iAddSubExIf(iAddSubExIf_MT),                                            \
-                                    .unsignedFlg(unsignedFlg_MT),                                            \
-                                    .cmpRsltSign(cmpRsltSign_MT),                                            \
-                                    .oLessThan(oLessThan_MT)                                                 \
+  `define ZionRiscvIsaLib_AddSubLessThan(UnitName,iAddSubExIf_MT,iUnsignedFlg_MT,iCmpRsltSign_MT,oLessThan_MT) \
+ZionRiscvIsaLib_AddSubLessThan  UnitName(                                                                      \
+                                    .iAddSubExIf(iAddSubExIf_MT),                                              \
+                                    .iUnsignedFlg(iUnsignedFlg_MT),                                            \
+                                    .iCmpRsltSign(iCmpRsltSign_MT),                                            \
+                                    .oLessThan(oLessThan_MT)                                                   \
                                   )
 `endif
 module ZionRiscvIsaLib_AddSubLessThan
-#(RV64=0
-)(
+(
   ZionRiscvIsaLib_AddSubExItf.LessThan iAddSubExIf,
   input iUnsignedFlg,
   input iCmpRsltSign,
   output logic oLessThan
 );
 
-  //localparam HIGH_BIT = 32*(RV64+1)-1;
-  //always_comb begin
-  //  if((iUnsignedFlg && (iAddSubExIf.s1[HIGH_BIT] ^ iAddSubExIf.s2[HIGH_BIT])) begin
-  //    oLessThan = iAddSubExIf.s2[HIGH_BIT];
-  //  end else begin
-  //    oLessThan = iCmpRsltSign;
-  //  end
-  //end
   always_comb begin
     oLessThan = iAddSubExIf.AddSubLessThan(iUnsignedFlg,iCmpRsltSign);
   end
