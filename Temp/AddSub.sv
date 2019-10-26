@@ -34,7 +34,7 @@ interface  ZionRiscvIsaLib_AddSubExItf
   logic [CPU_WIDTH-1:0] s1,s2,rslt;
 
   // TODO: add comments
-  function automatic logic LessThan(input unsignedFlg, cmpRsltSign); 
+  function automatic logic AddSubLessThan(input unsignedFlg, cmpRsltSign); 
     return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
   endfunction : LessThan
 
@@ -167,7 +167,7 @@ module ZionRiscvIsaLib_AddSubLessThan
   //  end
   //end
   always_comb begin
-    oLessThan = iAddSubExIf.LessThan(iUnsignedFlg,iCmpRsltSign);
+    oLessThan = iAddSubExIf.AddSubLessThan(iUnsignedFlg,iCmpRsltSign);
   end
 
 endmodule : ZionRiscvIsaLib_AddSubLessThan
