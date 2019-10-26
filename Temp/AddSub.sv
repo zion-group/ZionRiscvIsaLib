@@ -34,12 +34,13 @@ interface  ZionRiscvIsaLib_AddSubExItf
   logic [CPU_WIDTH-1:0] s1,s2,rslt;
 
   // TODO: add comments
-  //function automatic logic LessThan(input unsignedFlg, cmpRsltSign); 
-  //  return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
-  //endfunction : LessThan
+  function automatic logic LessThan(input unsignedFlg, cmpRsltSign); 
+    return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
+  endfunction : LessThan
 
   modport De (output op, s1, s2);
-  modport Ex (input  op, s1, s2, output rslt, import LessThan);
+  modport Ex (input  op, s1, s2, output rslt);
+  modport LessThan (input s1, s2, import LessThan);
 
 endinterface : ZionRiscvIsaLib_AddSubExItf
 `endif
@@ -151,19 +152,22 @@ endmodule : ZionRiscvIsaLib_AddSubExec
 module ZionRiscvIsaLib_AddSubLessThan
 #(RV64=0
 )(
-  ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
+  ZionRiscvIsaLib_AddSubExItf.LessThan iAddSubExIf,
   input iUnsignedFlg,
   input iCmpRsltSign,
   output logic oLessThan
 );
 
-  localparam HIGH_BIT = 32*(RV64+1)-1;
+  //localparam HIGH_BIT = 32*(RV64+1)-1;
+  //always_comb begin
+  //  if((iUnsignedFlg && (iAddSubExIf.s1[HIGH_BIT] ^ iAddSubExIf.s2[HIGH_BIT])) begin
+  //    oLessThan = iAddSubExIf.s2[HIGH_BIT];
+  //  end else begin
+  //    oLessThan = iCmpRsltSign;
+  //  end
+  //end
   always_comb begin
-    if((iUnsignedFlg && (iAddSubExIf.s1[HIGH_BIT] ^ iAddSubExIf.s2[HIGH_BIT])) begin
-      oLessThan = iAddSubExIf.s2[HIGH_BIT];
-    end else begin
-      oLessThan = iCmpRsltSign;
-    end
+    oLessThan = iAddSubExIf.LessThan(iUnsignedFlg,iCmpRsltSign);
   end
 
 endmodule : ZionRiscvIsaLib_AddSubLessThan
