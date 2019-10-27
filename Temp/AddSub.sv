@@ -107,9 +107,8 @@ module ZionRiscvIsaLib_AddSubExec
   // and subEn(iAddSubExIf.op[1]) is 1, the result will be undifined and lead to an error. So it is
   // necessary to assert the situation.
   always_comb begin
-    assert($onehot0({addEn, subEn})) begin 
-      error("Signal Error: Both addEn and subEn are both activated which only one could work.");
-    end
+    assert($onehot0({addEn, subEn})) ;
+    else $error("Signal Error: Both of addEn and subEn are activated which only one could work at a certain time.");
   end
 
 endmodule : ZionRiscvIsaLib_AddSubExec
