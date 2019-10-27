@@ -38,7 +38,7 @@ endinterface: ZionRiscvIsaLib_SftExItf
 `endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// module name : ZionRiscvIsaLib_SftExItf
+// Module name : ZionRiscvIsaLib_SftExItf
 // Author      : Wenheng Ma
 // Date        : 2019-10-27
 // Version     : 1.0
