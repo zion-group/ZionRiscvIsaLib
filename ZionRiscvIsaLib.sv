@@ -811,69 +811,6 @@ endmodule: ZionRiscvIsaLib_JumpLinkPc
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Interface name : ZionRiscvIsaLib_SltExItf
-// Author         : Wenheng Ma
-// Date           : 2019-08-02
-// Version        : 1.0
-// Description    :
-//   Define signals that SLT(set less than) operation ISA nead. And offer an Excution function to get the operation 
-//   result. Note that this interface can be reused by the branch instructions.
-//   'Set less than' contains 4 instructions: SLT/SLTI, SLTU/SLTIU.
-//   'Branch' contains 4 instructions: BLT/BLTU, BGE/BGEU.
-//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
-// Modification History:
-//   Date   |   Author   |   Version   |   Change Description
-//======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-`ifndef Disable_ZionRiscvIsaLib_SltExItf
-interface ZionRiscvIsaLib_SltExItf
-#(RV64 = 0);
-
-  localparam CPU_WIDTH = 32*(RV64+1);
-  logic en, unsignedFlg;
-  logic [CPU_WIDTH-1:0] s1,s2;
-
-  function automatic logic Exec;
-
-    logic signed [CPU_WIDTH:0]  s1Tmp, s2Tmp;
-    s1Tmp = {$bits(s1Tmp){en}} & {{(~unsignedFlg) & s1[CPU_WIDTH-1]} , s1};
-    s2Tmp = {$bits(s1Tmp){en}} & {{(~unsignedFlg) & s2[CPU_WIDTH-1]} , s2};
-    return ((s1Tmp<s2Tmp)? 1'b1:1'b0);
-
-  endfunction: Exec
-
-  modport De (output en, unsignedFlg, s1, s2);
-  modport Ex (input  en, unsignedFlg, s1, s2, import Exec);
-
-endinterface: ZionRiscvIsaLib_SltExItf
-`endif
-
-
-`ifndef Disable_ZionRiscvIsaLib_SetLessThan
-`ifdef ZionRiscvIsaLib_SetLessThan
-  `__DefErr__(ZionRiscvIsaLib_SetLessThan)
-`else
-  `define ZionRiscvIsaLib_SetLessThan(UnitName,iSltExIf_MT,oLessThan_MT) \
-  ZionRiscvIsaLib_SetLessThan UnitName(                                  \
-                                .iSltExIf(iSltExIf_MT),                  \
-                                .oLessThan(oLessThan_MT)                 \
-                              );
-`endif
-module ZionRiscvIsaLib_SetLessThan
-(
-  ZionRiscvIsaLib_SltExItf.Ex iSltExIf,
-  output logic oLessThan
-);
-
-  always_comb begin
-    oLessThan = iSltExIf.Exec();
-  end
-
-endmodule: ZionRiscvIsaLib_SetLessThan
-`endif
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_LoadExItf
 // Author         : Wenheng Ma
 // Date           : 2019-08-02
