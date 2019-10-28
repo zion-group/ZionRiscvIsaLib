@@ -8,6 +8,8 @@
 // Author         : Wenheng Ma
 // Date           : 2019-10-27
 // Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
 // Description    :
 //   Define signals that shift(sft) operation ISA nead.
 //   Shift operation contains 12 instructions: 

@@ -1,9 +1,16 @@
 
+//section: SetLessThanEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits about Set Less Than instructions are provided in this section.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_SltExItf
 // Author         : Wenheng Ma
 // Date           : 2019-10-27
 // Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
 // Description    :
 //   Define signals that SLT(set less than) operation ISA nead. And offer an Excution function to get the operation 
 //   result. Note that this interface can be reused by the branch instructions.
@@ -47,6 +54,7 @@ endinterface: ZionRiscvIsaLib_SltExItf
 // Author      : Wenheng Ma
 // Date        : 2019-10-27
 // Version     : 1.0
+// Parameter   : None
 // Description :
 //   Less than execution.
 // Modification History:
@@ -75,3 +83,5 @@ module ZionRiscvIsaLib_SetLessThan
 
 endmodule: ZionRiscvIsaLib_SetLessThan
 `endif
+
+//endsection: SetLessThanEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

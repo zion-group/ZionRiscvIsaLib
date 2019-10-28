@@ -7,6 +7,8 @@
 // Author         : Wenheng Ma
 // Date           : 2019-08-02
 // Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
 // Description    :
 //   Define signals that bit operation ISA nead. And offer an Excution function to get the bit operation result.
 //   Bit operation contains 6 instructions: AND/ANDI, OR/ORI, XOR/XORI.
