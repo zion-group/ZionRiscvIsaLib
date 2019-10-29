@@ -51,9 +51,10 @@
   `ZionRiscvIsaLib_ModuleDef(ImportName, BitsOpExec)                      \
   `ZionRiscvIsaLib_InterfaceDef(ImportName,BjExItf)                       \
   `ZionRiscvIsaLib_ModuleDef(ImportName, BjTgtAddr)                       \
-  `ZionRiscvIsaLib_ModuleDef(ImportName, BjEnNoLt)                        \
-  `ZionRiscvIsaLib_ModuleDef(ImportName, BjEnStandby)                     \
+  `ZionRiscvIsaLib_ModuleDef(ImportName, BjEnNoLessThan)                  \
+  `ZionRiscvIsaLib_ModuleDef(ImportName, BjEnGen)                         \
   `ZionRiscvIsaLib_ModuleDef(ImportName, JumpLinkPc)                      \
+  `ZionRiscvIsaLib_ModuleDef(ImportName, S1LinkOffsetMux)                 \
   `ZionRiscvIsaLib_InterfaceDef(ImportName,SftExItf)                      \
   `ZionRiscvIsaLib_ModuleDef(ImportName, SftExec)                         \
   `ZionRiscvIsaLib_InterfaceDef(ImportName,SltExItf)                      \
@@ -65,28 +66,28 @@
 
 `define Unuse_ZionRiscvIsaLib(ImportName)                                 \
   `undef ImportName``RvimazDecodeItf                                      \
-  `undef ImportName``AddSubExItf                                          \   
-  `undef ImportName``AddSubExec                                           \   
-  `undef ImportName``AddSubLessThan                                       \   
-  `undef ImportName``BitsExItf                                            \   
-  `undef ImportName``BitsOpExec                                           \   
-  `undef ImportName``BjExItf                                              \   
-  `undef ImportName``BjTgtAddr                                            \   
-  `undef ImportName``BjEnNoLt                                             \   
-  `undef ImportName``BjEnStandby                                          \   
-  `undef ImportName``JumpLinkPc                                           \   
-  `undef ImportName``SftExItf                                             \   
-  `undef ImportName``SftExec                                              \   
-  `undef ImportName``SltExItf                                             \   
-  `undef ImportName``SetLessThan                                          \   
-  `undef ImportName``LoadExItf                                            \   
-  `undef ImportName``StoreExItf                                           \   
-  `undef ImportName``IntInsExItf                                          \   
+  `undef ImportName``AddSubExItf                                          \
+  `undef ImportName``AddSubExec                                           \
+  `undef ImportName``AddSubLessThan                                       \
+  `undef ImportName``BitsExItf                                            \
+  `undef ImportName``BitsOpExec                                           \
+  `undef ImportName``BjExItf                                              \
+  `undef ImportName``BjTgtAddr                                            \
+  `undef ImportName``BjEnNoLessThan                                       \
+  `undef ImportName``BjEnGen                                              \
+  `undef ImportName``JumpLinkPc                                           \
+  `undef ImportName``S1LinkOffsetMux                                      \
+  `undef ImportName``SftExItf                                             \
+  `undef ImportName``SftExec                                              \
+  `undef ImportName``SltExItf                                             \
+  `undef ImportName``SetLessThan                                          \
+  `undef ImportName``LoadExItf                                            \
+  `undef ImportName``StoreExItf                                           \
+  `undef ImportName``IntInsExItf                                          \
   `undef ImportName``IntEx                                                
               
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 
 
