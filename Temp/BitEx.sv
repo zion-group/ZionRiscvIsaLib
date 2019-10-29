@@ -7,6 +7,8 @@
 // Author         : Wenheng Ma
 // Date           : 2019-08-02
 // Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
 // Description    :
 //   Define signals that bit operation ISA nead. And offer an Excution function to get the bit operation result.
 //   Bit operation contains 6 instructions: AND/ANDI, OR/ORI, XOR/XORI.
@@ -30,15 +32,18 @@ interface ZionRiscvIsaLib_BitsExItf
   // Get bit operation result. If more than 1 'xxEn' signals are acctivated, the result will be 
   // undifined and lead to an error.
   function automatic logic [CPU_WIDTH-1:0] Exec();
-    logic [CPU_WIDTH-1:0] andRslt, orRslt, xorRslt;
-    andRslt = {CPU_WIDTH{andEn}} & (s1 & s2); // and calculation
-    orRslt  = {CPU_WIDTH{orEn }} & (s1 | s2); // or  calculation
-    xorRslt = {CPU_WIDTH{xorEn}} & (s1 ^ s2); // xor calculation
-    return (andRslt | orRslt | xorRslt);
+    logic [CPU_WIDTH-1:0] rslt;
+    unique case (1'b1)
+      andEn  : rslt = (s1 & s2); // and calculation
+      orEn   : rslt = (s1 | s2); // or  calculation
+      xorEn  : rslt = (s1 ^ s2); // xor calculation
+      default: rslt = '0;
+    endcase
+    return rslt;
   endfunction
 
   modport De (output andEn, orEn, xorEn, s1, s2);
-  modport Ex (input  andEn, orEn, xorEn, s1, s2, import Exec);
+  modport Ex (input  andEn, orEn, xorEn, s1, s2, output rslt, import Exec);
 
 endinterface: ZionRiscvIsaLib_BitsExItf
 `endif
@@ -76,7 +81,10 @@ module ZionRiscvIsaLib_BitsOpExec
 
   // Only one kind of operation can be done in a certain cycle. If more than 1 'xxEn' signals are acctivated,
   // the result will be undifined and lead to an error. So it is necessary to assert the situation.
-  assert((iBitsExif.andEn + iBitsExif.orEn + iBitsExif.xorEn)>1) error("Signal Error: More than 1 'xxEn' signals are activated in iBitsExif.andEn, iBitsExif.orEn and iBitsExif.xorEn which only one could work.");
+  always_comb begin
+    assert($onehot0{iBitsExif.andEn, iBitsExif.orEn, iBitsExif.xorEn}) ;
+    else $error("Signal Error: More than 1 'xxEn' signals are activated in iBitsExif.andEn, iBitsExif.orEn and iBitsExif.xorEn which only one could work.");
+  end
 
 endmodule: ZionRiscvIsaLib_BitsOpExec
 `endif
