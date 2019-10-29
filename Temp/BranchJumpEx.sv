@@ -40,9 +40,9 @@ interface ZionRiscvIsaLib_BjExItf
   function automatic logic [CPU_WIDTH-1:0] TgtAddrGen;
 
     logic [CPU_WIDTH-1:0] baseAddr, tgtOffset;
-    baseAddr  =  ({$bits(pc){branch}} & pc)  // TODO: use Mask
-                |({$bits(s1){ jump }} & s1); // TODO: use Mask
-    tgtOffset = {$bits(offset){bjEn}} & offset;  // TODO: use Mask
+    baseAddr  =  ({$bits(pc){branch}} & pc)         // TODO: use Mask
+                |({$bits(s1){jump}} & s1);          // TODO: use Mask
+    tgtOffset = {$bits(offset){bjEn}} & offset;     // TODO: use Mask
     return (baseAddr + tgtOffset);
 
   endfunction : TgtAddrGen
@@ -62,15 +62,15 @@ interface ZionRiscvIsaLib_BjExItf
   endfunction : LessThan
 
   // Calculate the link pc. 
-  function automatic logic [CPU_WIDTH-1:0] LinkPcGen;
-    return (({$bits(pc){jump}}&pc) + ({linkOffset,1'b0}}); // TODO: use Mask
+  function automatic logic [CPU_WIDTH-1:0] LinkPcGen; 
+    return (({$bits(pc){jump}}&pc) + ({linkOffset,1'b0})); // TODO: use Mask
   endfunction : LinkPcGen
 
   // To reuse adder for generating link pc, the function works as a mux that selects s1 or link offset.
   // But it is implemented by 'bit or' for high bits. So it has a better performance.
   function automatic logic [CPU_WIDTH-1:0] S1LinkOffsetMux;
     logic [CPU_WIDTH-1:0] s1Mask, muxRslt;
-    s1Mask = (~(s1|jump));
+    s1Mask = (~(s1|{$bits(s1){jump}}));
     muxRslt[CPU_WIDTH-1:3] = s1Mask[CPU_WIDTH-1:3];
     muxRslt[2:1] = s1Mask[2:1] | linkOffset;
     muxRslt[ 0 ] = s1Mask[ 0 ];
@@ -146,14 +146,14 @@ endmodule: ZionRiscvIsaLib_BjTgtAddr
   `define ZionRiscvIsaLib_BjEnNoLessThan(UnitName,iBjExIf_MT,iLessThan_MT,oBjEn_MT) \
   ZionRiscvIsaLib_BjEnNoLessThan  UnitName(                                         \
                               .iBjExIf(iBjExIf_MT),                                 \
-                              .iLessThan(iLessThan)                                 \
+                              .iLessThan(iLessThan_MT),                              \
                               .oBjEn(oBjEn_MT)                                      \
                             )
 `endif
 module ZionRiscvIsaLib_BjEnNoLessThan
 (
   ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
-  input                      iLessThan
+  input                      iLessThan,
   output logic [1:0]         oBjEn
 );
 
@@ -161,8 +161,8 @@ module ZionRiscvIsaLib_BjEnNoLessThan
   always_comb begin
     equal    = (iBjExIf.s1 == iBjExIf.s2);
     oBjEn[1] =  iBjExIf.jump                   // jump instuction lead to branch&jump
-              |(iBjExIf.beq & iBjExIf.equal)   // Beq  instuction lead to branch&jump
-              |(iBjExIf.bne & !iBjExIf.equal); // Bne  instuction lead to branch&jump
+              |(iBjExIf.beq & equal)           // Beq  instuction lead to branch&jump
+              |(iBjExIf.bne & !equal);         // Bne  instuction lead to branch&jump
     oBjEn[0] = (iBjExIf.blt & iLessThan)       // Blt  instuction lead to branch&jump
               |(iBjExIf.bge & !iLessThan);     // Bge  instuction lead to branch&jump
   end
@@ -274,7 +274,7 @@ endmodule: ZionRiscvIsaLib_JumpLinkPc
   `define ZionRiscvIsaLib_S1LinkOffsetMux(UnitName,iBjExIf_MT,ooS1MuxIf_MT) \
 ZionRiscvIsaLib_S1LinkOffsetMux  UnitName(                                  \
                                 .iBjExIf(iBjExIf_MT),                       \
-                                .ooS1MuxIf(ooS1MuxIf_MT)                    \
+                                .oS1MuxIf(ooS1MuxIf_MT)                    \
                               )
 `endif
 module ZionRiscvIsaLib_S1LinkOffsetMux
