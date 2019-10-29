@@ -1,9 +1,9 @@
 module ZionRiscvIsaLib_BitsOpExec_tb;
-`Use_ZionRiscvIsaLib(Ri)
+`Use_ZionRiscvIsaLib(Rvi)
   parameter RV64=0;
   parameter CPU_WIDTH = 32*(RV64+1); 
   parameter half_period = 5;
-  `RiBitsExItf #(RV64) iBitsEx();
+  `RviBitsExItf #(RV64) iBitsEx();
   logic                 clk;
   logic [1:0]           OpSel;
   logic [CPU_WIDTH-1:0] out;
@@ -73,6 +73,6 @@ module ZionRiscvIsaLib_BitsOpExec_tb;
     #500 $finish;
   end 
  
-  `RiBitsOpExec (U_BitsEx,iBitsEx);
-`Unuse_ZionRiscvIsaLib(Ri) 
+  `RviBitsOpExec (U_BitsEx,iBitsEx);
+`Unuse_ZionRiscvIsaLib(Rvi) 
 endmodule : ZionRiscvIsaLib_BitsOpExec_tb
