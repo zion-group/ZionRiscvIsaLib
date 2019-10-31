@@ -67,7 +67,7 @@ endinterface: ZionRiscvIsaLib_BitsExItf
 `ifdef ZionRiscvIsaLib_BitsOpExec
   `__DefErr__(ZionRiscvIsaLib_BitsOpExec)
 `else
-  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT) 
+  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT) \
 ZionRiscvIsaLib_BitsOpExec UnitName(.iBitsExif(iBitsExif_MT));
 `endif
 module ZionRiscvIsaLib_BitsOpExec
@@ -82,7 +82,7 @@ module ZionRiscvIsaLib_BitsOpExec
   // Only one kind of operation can be done in a certain cycle. If more than 1 'xxEn' signals are acctivated,
   // the result will be undifined and lead to an error. So it is necessary to assert the situation.
   always_comb begin
-    assert($onehot0{iBitsExif.andEn, iBitsExif.orEn, iBitsExif.xorEn}) ;
+    assert($onehot0({iBitsExif.andEn, iBitsExif.orEn, iBitsExif.xorEn})) 
     else $error("Signal Error: More than 1 'xxEn' signals are activated in iBitsExif.andEn, iBitsExif.orEn and iBitsExif.xorEn which only one could work.");
   end
 

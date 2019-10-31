@@ -36,7 +36,7 @@ interface  ZionRiscvIsaLib_AddSubExItf
   // TODO: add comments
   function automatic logic AddSubLessThan(input unsignedFlg, cmpRsltSign); 
     return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
-  endfunction : LessThan
+  endfunction : AddSubLessThan
 
   modport De (output op, s1, s2);
   modport Ex (input  op, s1, s2, output rslt);
@@ -106,11 +106,10 @@ module ZionRiscvIsaLib_AddSubExec
   // Only one kind of operation can be done in a certain cycle. If both of addEn(iAddSubExIf.op[0])
   // and subEn(iAddSubExIf.op[1]) is 1, the result will be undifined and lead to an error. So it is
   // necessary to assert the situation.
-  always_comb begin
-    assert($onehot0({addEn, subEn})) ;
+ always_comb begin
+    assert ($onehot0({addEn, subEn}))
     else $error("Signal Error: Both of addEn and subEn are activated which only one could work at a certain time.");
   end
-
 endmodule : ZionRiscvIsaLib_AddSubExec
 `endif
 

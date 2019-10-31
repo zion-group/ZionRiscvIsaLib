@@ -1,6 +1,6 @@
 //  RV32
 module ZionRiscvIsaLib_AddSubExec_RV32_tb;
-`Use_ZionRiscvIsaLib(Ri)
+`Use_ZionRiscvIsaLib(Rvi)
   parameter CPU_WIDTH = 32; 
   parameter half_period = 5;
 
@@ -13,7 +13,7 @@ module ZionRiscvIsaLib_AddSubExec_RV32_tb;
   logic signed [CPU_WIDTH:0]   signs1;
   logic signed [CPU_WIDTH:0]   signs2;
 
-  `RiAddSubExItf #(0)    AddSubEx();
+  `RviAddSubExItf #(0)    AddSubEx();
 
   initial begin
   	clk = 0;
@@ -83,9 +83,7 @@ module ZionRiscvIsaLib_AddSubExec_RV32_tb;
  initial begin
    forever @(posedge clk) begin
       #(half_period/5);
-      if(AddSubEx.op[0] == 1) begin
-        $warning("It is not allowed to use lessthan when Exop is add!");
-      end else if (AddSubEx.op[1] == 1 && lessthanrslt != lessthanout)begin
+      if (AddSubEx.op[1] == 1 && lessthanrslt != lessthanout)begin
         $error("lessthan rslt error, %0d != %0d",lessthanrslt,lessthanout);
         $finish;
       end
@@ -94,12 +92,12 @@ module ZionRiscvIsaLib_AddSubExec_RV32_tb;
 
   initial begin
     $fsdbDumpfile("tb.fsdb");
-    $fsdbDumpvars(0,ZionRiscvIsaLib_BitsOpExec_tb,"+all");
+    $fsdbDumpvars(0,ZionRiscvIsaLib_AddSubExec_RV32_tb,"+all");
     #500 $finish;
   end 
 
-  `RiAddSubExec (U_AddSubExec,AddSubEx);
-  `RiAddSubLessThan(U_AddSubLessThan,AddSubEx,unsignedFlg,AddSubEx.rslt[$high(AddSubEx.rslt)],lessthanrslt);
-`Unuse_ZionRiscvIsaLib(Ri)
-endmodule
+  `RviAddSubExec (U_AddSubExec,AddSubEx);
+  `RviAddSubLessThan(U_AddSubLessThan,AddSubEx,unsignedFlg,AddSubEx.rslt[$high(AddSubEx.rslt)],lessthanrslt);
+`Unuse_ZionRiscvIsaLib(Rvi)
+endmodule : ZionRiscvIsaLib_AddSubExec_RV32_tb
 
