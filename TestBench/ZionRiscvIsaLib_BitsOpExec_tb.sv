@@ -7,6 +7,7 @@ module ZionRiscvIsaLib_BitsOpExec_tb;
   logic                 clk;
   logic [1:0]           OpSel;
   logic [CPU_WIDTH-1:0] out;
+  logic [CPU_WIDTH-1:0] rslt;
  
   initial begin
   	clk = 0;
@@ -54,14 +55,14 @@ module ZionRiscvIsaLib_BitsOpExec_tb;
   initial begin
     forever @(posedge clk) begin
       #(half_period/5);
-      if (iBitsEx.andEn && iBitsEx.rslt != out) begin
-        $error("and rslt error,%0d != %0d",iBitsEx.rslt,out);
+      if (iBitsEx.andEn && rslt != out) begin
+        $error("and rslt error,%0d != %0d",rslt,out);
         $finish;
-      end else if (iBitsEx.orEn && iBitsEx.rslt != out) begin 
-        $error("or rslt error, %0d != %0d",iBitsEx.rslt,out);
+      end else if (iBitsEx.orEn && rslt != out) begin 
+        $error("or rslt error, %0d != %0d",rslt,out);
         $finish;
-      end else if (iBitsEx.xorEn && iBitsEx.rslt != out) begin 
-        $error("xor rslt error,%0d != %0d",iBitsEx.rslt,out);
+      end else if (iBitsEx.xorEn && rslt != out) begin 
+        $error("xor rslt error,%0d != %0d",rslt,out);
         $finish;
       end
     end 
@@ -73,6 +74,6 @@ module ZionRiscvIsaLib_BitsOpExec_tb;
     #500 $finish;
   end 
  
-  `RviBitsOpExec (U_BitsEx,iBitsEx);
+  `RviBitsOpExec (U_BitsEx,iBitsEx,rslt);
 `Unuse_ZionRiscvIsaLib(Rvi) 
 endmodule : ZionRiscvIsaLib_BitsOpExec_tb

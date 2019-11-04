@@ -15,10 +15,13 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
   logic [1:0]           BjEnNoLessThanrslt;
   logic [2:0]           OpSel;
   logic [CPU_WIDTH-1:0] tgtAddrout;
-  logic [CPU_WIDTH  :0] signs1;
-  logic [CPU_WIDTH  :0] signs2;
+  logic [CPU_WIDTH-1:0] tgtAddr;
+  logic signed [CPU_WIDTH  :0] signs1;
+  logic signed [CPU_WIDTH  :0] signs2;
   logic [CPU_WIDTH-1:0] LinkPcout;
+  logic [CPU_WIDTH-1:0] linkPc;
   logic [CPU_WIDTH-1:0] s1Fnlout;
+  logic [CPU_WIDTH-1:0] s1Fnl;
 
   initial begin
   	clk = 0;
@@ -60,7 +63,7 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
   	case(offsel)
   		 'd0:   linkOffset = 2'b01;  
   		 'd1:   linkOffset = 2'b10;
-     default:   linkOffset = 2'b00;
+     default: linkOffset = 2'b00;
   	endcase // offsel
   end
   always_comb begin
@@ -70,7 +73,7 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
   		 'b110_0100: tgtAddrout = iBjEx.pc + iBjEx.offset; 
   		 'b110_1000: tgtAddrout = iBjEx.pc + iBjEx.offset;
   		 'b111_0000: tgtAddrout = iBjEx.pc + iBjEx.offset;
-  	        default: tgtAddrout = 'd0;
+  	      default: tgtAddrout = 'd0;
   	endcase 
   end
 
@@ -107,8 +110,8 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
  initial begin
    forever @(posedge clk) begin
       #(half_period/5);
-      if (oBjEx.tgtAddr != tgtAddrout)begin
-        $error("tgtAddr rslt error, %0d != %0d",iBjEx.tgtAddr,tgtAddrout);
+      if (tgtAddr != tgtAddrout)begin
+        $error("tgtAddr rslt error, %0d != %0d",tgtAddr,tgtAddrout);
         $finish;
       end
     end 
@@ -137,8 +140,8 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
  initial begin
    forever @(posedge clk) begin
       #(half_period/5);
-      if (oBjEx.linkPc != LinkPcout)begin
-        $error("LinkPc rslt error, %0d != %0d",oBjEx.linkPc,LinkPcout);
+      if (linkPc != LinkPcout)begin
+        $error("LinkPc rslt error, %0d != %0d",linkPc,LinkPcout);
         $finish;
       end
     end 
@@ -160,31 +163,11 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
    #500 $finish;
  end 
 
- `RviBjTgtAddr (U_BjTgtAddr,
- 	            iBjEx,
- 	            oBjEx
- 	           ); 
-
- `RviBjEnNoLessThan (U_BjEnNoLessThan,
- 	                 iBjEx,
- 	                 LessThan,
- 	                 BjEnNoLessThanrslt
- 	                );
-
- `RviBjEnGen (U_BjEnGen,
- 	          iBjEx,
- 	          BjEnrslt
- 	         );
-
- `RviJumpLinkPc (U_JumpLinkPc,
- 	             iBjEx,
- 	             oBjEx
- 	            );
-
- `RviS1LinkOffsetMux (U_S1LinkOffsetMux,
- 	                  iBjEx,
- 	                  oBjEx
- 	                 );
+ `RviBjTgtAddr (U_BjTgtAddr,iBjEx,tgtAddr); 
+ `RviBjEnNoLessThan (U_BjEnNoLessThan,iBjEx,LessThan,BjEnNoLessThanrslt);
+ `RviBjEnGen (U_BjEnGen,iBjEx,BjEnrslt);
+ `RviJumpLinkPc (U_JumpLinkPc,iBjEx,linkPc);
+ `RviS1LinkOffsetMux (U_S1LinkOffsetMux,iBjEx,s1Fnl);
 
 `Unuse_ZionRiscvIsaLib(Rvi)
 endmodule : ZionRiscvIsaLib_BranchJumpEx_tb
