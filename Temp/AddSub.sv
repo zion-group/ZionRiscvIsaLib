@@ -39,7 +39,7 @@ interface  ZionRiscvIsaLib_AddSubExItf
   endfunction : AddSubLessThan
 
   modport De (output op, s1, s2);
-  modport Ex (input  op, s1, s2, output rslt);
+  modport Ex (input  op, s1, s2);
   modport LessThan (input s1, s2, import AddSubLessThan);
 
 endinterface : ZionRiscvIsaLib_AddSubExItf
@@ -67,23 +67,25 @@ endinterface : ZionRiscvIsaLib_AddSubExItf
 `ifdef ZionRiscvIsaLib_AddSubExec
   `__DefErr__(ZionRiscvIsaLib_AddSubExec)
 `else
-  `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT)   \
-`ifdef VIVADO_SYN                                               \
-    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;           \
-  `else                                                         \
-    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1; \
-  `endif                                                        \
-  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64))           \
-                            UnitName(                           \
-                              .iAddSubExIf(iAddSubExIf_MT)      \
-                            )
+  `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT,oRslt_MT)   \
+`ifdef VIVADO_SYN                                                        \
+    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                    \
+  `else                                                                  \
+    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;          \
+  `endif                                                                 \
+  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64))                    \
+                            UnitName(                                    \
+                              .iAddSubExIf(iAddSubExIf_MT),              \
+                              .oRslt(oRslt_MT)                           \
+                            );
 `endif
 module ZionRiscvIsaLib_AddSubExec
 #(RV64 = 0
 )(
-  ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf
+  ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
+  output logic [$bits(iAddSubExIf.s1)-1:0] oRslt
 );
-
+ `Use_ZionBasicCircuitLib(Bc)
   localparam CPU_WIDTH = 32*(RV64+1);
   logic [CPU_WIDTH-1:0] s1, s1Tmp, s2, s2Tmp, rsltTmp;
   wire addEn = iAddSubExIf.op[0];
@@ -91,16 +93,17 @@ module ZionRiscvIsaLib_AddSubExec
   always_comb begin
     s1      = iAddSubExIf.s1;
     s2      = iAddSubExIf.s2;
-    s1Tmp   = {$bits(s1){addEn|subEn}} & s1; //TODO: use BasicCircuitLib in the code
-    s2Tmp   =   ({$bits(s2){subEn}} & ~s2)
-              | ({$bits(s2){addEn}} &  s2);
-    rsltTmp = (s1Tmp + s2Tmp + subEn);
+    // s1Tmp   = {$bits(s1){addEn|subEn}} & s1; //TODO: use BasicCircuitLib in the code
+    // s2Tmp   =   ({$bits(s2){subEn}} & ~s2)
+    //           | ({$bits(s2){addEn}} &  s2);
+    // rsltTmp = (s1Tmp + s2Tmp + subEn);
+    rsltTmp = `BcAddSubdM(addEn,subEn,s1,s2);
   end
   `gen_if(RV64) begin : Rv64RsltGen
     wire WFlg = iAddSubExIf.op[2];
-    assign iAddSubExIf.rslt = (WFlg) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
+    assign oRslt = (WFlg) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
   end `gen_else begin : Rv32RsltGen
-    assign iAddSubExIf.rslt = rsltTmp;
+    assign oRslt = rsltTmp;
   end
 
   // Only one kind of operation can be done in a certain cycle. If both of addEn(iAddSubExIf.op[0])
@@ -110,6 +113,8 @@ module ZionRiscvIsaLib_AddSubExec
     assert ($onehot0({addEn, subEn}))
     else $error("Signal Error: Both of addEn and subEn are activated which only one could work at a certain time.");
   end
+
+ `Unuse_ZionBasicCircuitLib(Bc)
 endmodule : ZionRiscvIsaLib_AddSubExec
 `endif
 
@@ -139,7 +144,7 @@ ZionRiscvIsaLib_AddSubLessThan  UnitName(                                       
                                     .iUnsignedFlg(iUnsignedFlg_MT),                                            \
                                     .iCmpRsltSign(iCmpRsltSign_MT),                                            \
                                     .oLessThan(oLessThan_MT)                                                   \
-                                  )
+                                  );
 `endif
 module ZionRiscvIsaLib_AddSubLessThan
 (

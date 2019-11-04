@@ -25,6 +25,7 @@
 `ifndef Disable_ZionRiscvIsaLib_SltExItf
 interface ZionRiscvIsaLib_SltExItf
 #(RV64 = 0);
+`Use_ZionBasicCircuitLib(Bc)
 
   localparam CPU_WIDTH = 32*(RV64+1);
   logic en, unsignedFlg, rslt;
@@ -35,17 +36,22 @@ interface ZionRiscvIsaLib_SltExItf
   function automatic logic Exec;
 
     logic signed [CPU_WIDTH:0] s1Extd, s1Mask, s2Extd, s2Mask;
-    s1Extd = {((~unsignedFlg) & s1[CPU_WIDTH-1]) , s1}; // Extend s1 according unsignedFld // TODO: use HighBit
-    s2Extd = {((~unsignedFlg) & s2[CPU_WIDTH-1]) , s2}; // Extend s2 according unsignedFld// TODO: use HighBit
-    s1Mask = {$bits(s1Extd){en}} & s1Extd; // TODO: use Mask
-    s2Mask = {$bits(s2Extd){en}} & s2Extd; // TODO: use Mask
+    // s1Extd = {((~unsignedFlg) & s1[CPU_WIDTH-1]) , s1}; // Extend s1 according unsignedFld // TODO: use HighBit
+    // s2Extd = {((~unsignedFlg) & s2[CPU_WIDTH-1]) , s2}; // Extend s2 according unsignedFld// TODO: use HighBit
+    // s1Mask = {$bits(s1Extd){en}} & s1Extd; // TODO: use Mask
+    // s2Mask = {$bits(s2Extd){en}} & s2Extd; // TODO: use Mask
+    s1Extd = {((~unsignedFlg) & `BcHighB(s1)) , s1};
+    s2Extd = {((~unsignedFlg) & `BcHighB(s2)) , s2};
+    s1Mask = `BcMaskM(en,s1Extd);
+    s2Mask = `BcMaskM(en,s2Extd);
     return ((s1Mask<s2Mask)? 1'b1:1'b0);
 
   endfunction: Exec
 
   modport De (output en, unsignedFlg, s1, s2);
-  modport Ex (input  en, unsignedFlg, s1, s2, output rslt, import Exec);
+  modport Ex (input  en, unsignedFlg, s1, s2, import Exec);
 
+ `Unuse_ZionBasicCircuitLib(Bc)
 endinterface: ZionRiscvIsaLib_SltExItf
 `endif
 
@@ -67,18 +73,20 @@ endinterface: ZionRiscvIsaLib_SltExItf
 `ifdef ZionRiscvIsaLib_SetLessThan
   `__DefErr__(ZionRiscvIsaLib_SetLessThan)
 `else
-  `define ZionRiscvIsaLib_SetLessThan(UnitName,iSltExIf_MT,oLessThan_MT) \
-  ZionRiscvIsaLib_SetLessThan UnitName(                                  \
-                                .iSltExIf(iSltExIf_MT)                   \
-                              )
+  `define ZionRiscvIsaLib_SetLessThan(UnitName,iSltExIf_MT,oRslt_MT)      \
+  ZionRiscvIsaLib_SetLessThan UnitName(                                   \
+                                .iSltExIf(iSltExIf_MT),                   \
+                                .oRslt(oRslt_MT)                          \
+                              );
 `endif
 module ZionRiscvIsaLib_SetLessThan
 (
-  ZionRiscvIsaLib_SltExItf.Ex iSltExIf
+  ZionRiscvIsaLib_SltExItf.Ex iSltExIf,
+  output logic  [$bits(iSltExIf.s1)-1:0] oRslt
 );
 
   always_comb begin
-    iSltExIf.rslt = iSltExIf.Exec();
+    oRslt = iSltExIf.Exec();
   end
 
 endmodule: ZionRiscvIsaLib_SetLessThan

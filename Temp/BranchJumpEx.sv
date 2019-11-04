@@ -29,7 +29,7 @@
 `ifndef Disable_ZionRiscvIsaLib_BjExItf
 interface ZionRiscvIsaLib_BjExItf
 #(RV64 = 0);
-
+ `Use_ZionBasicCircuitLib(Bc)
   localparam CPU_WIDTH = 32*(RV64+1);
   logic bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump;
   logic [1:0] linkOffset;
@@ -40,9 +40,12 @@ interface ZionRiscvIsaLib_BjExItf
   function automatic logic [CPU_WIDTH-1:0] TgtAddrGen;
 
     logic [CPU_WIDTH-1:0] baseAddr, tgtOffset;
-    baseAddr  =  ({$bits(pc){branch}} & pc)         // TODO: use Mask
-                |({$bits(s1){jump}} & s1);          // TODO: use Mask
-    tgtOffset = {$bits(offset){bjEn}} & offset;     // TODO: use Mask
+    // baseAddr  =  ({$bits(pc){branch}} & pc)         // TODO: use Mask
+    //             |({$bits(s1){jump}} & s1);          // TODO: use Mask
+    // tgtOffset = {$bits(offset){bjEn}} & offset;     // TODO: use Mask
+    baseAddr  =  `BcMaskM(branch,pc)     
+                |`BcMaskM(jump,s1);      
+    tgtOffset =  `BcMaskM(bjEn,offset);  
     return (baseAddr + tgtOffset);
 
   endfunction : TgtAddrGen
@@ -53,17 +56,22 @@ interface ZionRiscvIsaLib_BjExItf
   function automatic logic LessThan;
 
     logic signed [CPU_WIDTH:0] s1Extd, s1Mask, s2Extd, s2Mask;
-    s1Extd = {((~unsignedFlg) & s1[CPU_WIDTH-1]) , s1}; // Extend s1 according unsignedFld // TODO: use HighBit
-    s2Extd = {((~unsignedFlg) & s2[CPU_WIDTH-1]) , s2}; // Extend s2 according unsignedFld// TODO: use HighBit
-    s1Mask = {$bits(s1Extd){branch}} & s1Extd; // TODO: use Mask
-    s2Mask = {$bits(s2Extd){branch}} & s2Extd; // TODO: use Mask
+    // s1Extd = {((~unsignedFlg) & s1[CPU_WIDTH-1]) , s1}; // Extend s1 according unsignedFld // TODO: use HighBit
+    // s2Extd = {((~unsignedFlg) & s2[CPU_WIDTH-1]) , s2}; // Extend s2 according unsignedFld// TODO: use HighBit
+    // s1Mask = {$bits(s1Extd){branch}} & s1Extd; // TODO: use Mask
+    // s2Mask = {$bits(s2Extd){branch}} & s2Extd; // TODO: use Mask
+    s1Extd = {((~unsignedFlg) & `BcHighB(s1)) , s1}; 
+    s2Extd = {((~unsignedFlg) & `BcHighB(s2)) , s2};
+    s1Mask =`BcMaskM(branch,s1Extd);
+    s1Mask =`BcMaskM(branch,s2Extd);
     return ((s1Mask<s2Mask)? 1'b1:1'b0);
 
   endfunction : LessThan
 
   // Calculate the link pc. 
   function automatic logic [CPU_WIDTH-1:0] LinkPcGen; 
-    return (({$bits(pc){jump}}&pc) + ({linkOffset,1'b0})); // TODO: use Mask
+    // return (({$bits(pc){jump}}&pc) + ({linkOffset,1'b0})); // TODO: use Mask
+    return (`BcMaskM(jump,pc) + ({linkOffset,1'b0}));
   endfunction : LinkPcGen
 
   // To reuse adder for generating link pc, the function works as a mux that selects s1 or link offset.
@@ -81,9 +89,10 @@ interface ZionRiscvIsaLib_BjExItf
   modport Ex( input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset,
               import LessThan
             );
-  modport BjTgtAddrOut (output tgtAddr);
-  modport JumpLinkPcOut(output linkPc );
-  modport S1MuxOut(output s1Fnl);
+  // modport BjTgtAddrOut (output tgtAddr);
+  // modport JumpLinkPcOut(output linkPc );
+  // modport S1MuxOut(output s1Fnl);
+  `Unuse_ZionBasicCircuitLib(Bc)
 endinterface : ZionRiscvIsaLib_BjExItf
 `endif
 
@@ -105,20 +114,20 @@ endinterface : ZionRiscvIsaLib_BjExItf
 `ifdef ZionRiscvIsaLib_BjTgtAddr
   `__DefErr__(ZionRiscvIsaLib_BjTgtAddr)
 `else
-  `define ZionRiscvIsaLib_BjTgtAddr(UnitName,iBjExIf_MT,oTgtAddrIf_MT) \
+  `define ZionRiscvIsaLib_BjTgtAddr(UnitName,iBjExIf_MT,oTgtAddr_MT)   \
 ZionRiscvIsaLib_BjTgtAddr UnitName(                                    \
                               .iBjExIf(iBjExIf_MT),                    \
-                              .oTgtAddrIf(oTgtAddrIf_MT)               \
-                            )
+                              .oTgtAddr(oTgtAddr_MT)                   \
+                            );
 `endif
 module ZionRiscvIsaLib_BjTgtAddr
 (
   ZionRiscvIsaLib_BjExItf iBjExIf,
-  ZionRiscvIsaLib_BjExItf.BjTgtAddrOut oTgtAddrIf
+  output logic [$bits(iBjExIf.s1)-1:0] oTgtAddr
 );
 
   always_comb begin
-    oTgtAddrIf.tgtAddr  = iBjExIf.TgtAddrGen();
+    oTgtAddr  = iBjExIf.TgtAddrGen();
   end
 
 endmodule: ZionRiscvIsaLib_BjTgtAddr
@@ -146,9 +155,9 @@ endmodule: ZionRiscvIsaLib_BjTgtAddr
   `define ZionRiscvIsaLib_BjEnNoLessThan(UnitName,iBjExIf_MT,iLessThan_MT,oBjEn_MT) \
   ZionRiscvIsaLib_BjEnNoLessThan  UnitName(                                         \
                               .iBjExIf(iBjExIf_MT),                                 \
-                              .iLessThan(iLessThan_MT),                              \
+                              .iLessThan(iLessThan_MT),                             \
                               .oBjEn(oBjEn_MT)                                      \
-                            )
+                            );
 `endif
 module ZionRiscvIsaLib_BjEnNoLessThan
 (
@@ -195,7 +204,7 @@ endmodule: ZionRiscvIsaLib_BjEnNoLessThan
   ZionRiscvIsaLib_BjEnGen UnitName(                             \
                                 .iBjExIf(iBjExIf_MT),           \
                                 .oBjEn(oBjEn_MT)                \
-                              )
+                              );
 `endif
 module ZionRiscvIsaLib_BjEnGen
 (
@@ -234,20 +243,20 @@ endmodule: ZionRiscvIsaLib_BjEnGen
 `ifdef ZionRiscvIsaLib_JumpLinkPc
   `__DefErr__(ZionRiscvIsaLib_JumpLinkPc)
 `else
-  `define ZionRiscvIsaLib_JumpLinkPc(UnitName,iBjExIf_MT,oLinkPcIf_MT) \
-ZionRiscvIsaLib_JumpLinkPc  UnitName(                                  \
-                                .iBjExIf(iBjExIf_MT),                  \
-                                .oLinkPcIf(oLinkPcIf_MT)               \
-                              )
+  `define ZionRiscvIsaLib_JumpLinkPc(UnitName,iBjExIf_MT,oLinkPc_MT) \
+ZionRiscvIsaLib_JumpLinkPc  UnitName(                                \
+                                .iBjExIf(iBjExIf_MT),                \
+                                .oLinkPc(oLinkPc_MT)                 \
+                              );
 `endif
 module ZionRiscvIsaLib_JumpLinkPc
 (
   ZionRiscvIsaLib_BjExItf               iBjExIf,
-  ZionRiscvIsaLib_BjExItf.JumpLinkPcOut oLinkPcIf
+  output logic [$bits(iBjExIf.s1)-1:0]  oLinkPc
 );
 
   always_comb begin
-    oLinkPcIf.linkPc = iBjExIf.LinkPcGen();
+    oLinkPc = iBjExIf.LinkPcGen();
   end
 
 endmodule: ZionRiscvIsaLib_JumpLinkPc
@@ -271,20 +280,20 @@ endmodule: ZionRiscvIsaLib_JumpLinkPc
 `ifdef ZionRiscvIsaLib_S1LinkOffsetMux
   `__DefErr__(ZionRiscvIsaLib_S1LinkOffsetMux)
 `else
-  `define ZionRiscvIsaLib_S1LinkOffsetMux(UnitName,iBjExIf_MT,ooS1MuxIf_MT) \
+  `define ZionRiscvIsaLib_S1LinkOffsetMux(UnitName,iBjExIf_MT,ooS1Mux_MT)   \
 ZionRiscvIsaLib_S1LinkOffsetMux  UnitName(                                  \
                                 .iBjExIf(iBjExIf_MT),                       \
-                                .oS1MuxIf(ooS1MuxIf_MT)                    \
-                              )
+                                .oS1Mux(ooS1Mux_MT)                         \
+                              );
 `endif
 module ZionRiscvIsaLib_S1LinkOffsetMux
 (
   ZionRiscvIsaLib_BjExItf          iBjExIf,
-  ZionRiscvIsaLib_BjExItf.S1MuxOut oS1MuxIf
+  output logic  [$bits(iBjExIf.s1)-1:0] oS1Mux
 );
 
   always_comb begin
-    oS1MuxIf.s1Fnl = iBjExIf.S1LinkOffsetMux();
+    oS1Mux = iBjExIf.S1LinkOffsetMux();
   end
 
 endmodule : ZionRiscvIsaLib_S1LinkOffsetMux

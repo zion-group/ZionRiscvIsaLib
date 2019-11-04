@@ -58,11 +58,11 @@ interface ZionRiscvIsaLib_IntInsExItf
   // modport for integer instructions excution with branch&jump.
   modport IntBjDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                             sftLeft, sftRight, sftA, sltEn,
-                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump,
+                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump
                     );
   modport IntBjExIn (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                             sftLeft, sftRight, sftA, sltEn,
-                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump,
+                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump
                     );
   modport IntBjExOut(output  intRslt, BjEn, BjTgt);
 
@@ -129,9 +129,9 @@ module ZionRiscvIsaLib_IntEx
     SftIf.s1      = iDat.s1       ;
     SftIf.s2[4:0] = iDat.s2[4:0]  ;
 
-    AddSubIf.op[0] = iDat.addEn;
-    AddSubIf.op[1] = iDat.subEn;
-    AddSubIf.s2    = iDat.s2;
+    AddSubIf.op[0] = iDat.addEn   ;
+    AddSubIf.op[1] = iDat.subEn   ;
+    AddSubIf.s2    = iDat.s2      ;
   end
 
   `gen_if(RV64) begin
@@ -142,13 +142,13 @@ module ZionRiscvIsaLib_IntEx
   end
 
   `ZionRiscvIsaLib_BitsOpExec (U_BitsOpExec, BitsIf.Ex  );
-  `ZionRiscvIsaLib_SftExec    (U_SftExec   , SftIf.Ex   );
-  `ZionRiscvIsaLib_AddSubExec (U_AddSubExec, AddSubIf.Ex);
+  `ZionRiscvIsaLib_SftExec    (U_SftExec   , SftIf);
+  `ZionRiscvIsaLib_AddSubExec (U_AddSubExec, AddSubIf);
 
   `gen_if(INT_MODULE_TYPE==0 | INT_MODULE_TYPE==1) begin: IntModuleType_0_1
     wire [CPU_WIDTH-1:0] addSubRslt = AddSubIf.rslt;
     wire lessThanFlg = addSubRslt[$high(addSubRslt)]; //TODO: use HighB
-    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, BjIf.S1MuxOut)
+    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, BjIf.S1MuxOut);
     ZionRiscvIsaLib_BjExItf#(RV64) BjIf();
     always_comb begin
       AddSubIf.s1    = BjIf.s1Fnl;
@@ -172,7 +172,7 @@ module ZionRiscvIsaLib_IntEx
       oDat.BjTgt   = BjIf.tgtAddr;
     end
     `ZionRiscvIsaLib_AddSubLessThan (U_AddSubLessThan, AddSubIf.Ex, unsignedFlg, lessThanFlg, sltRslt);
-    `ZionRiscvIsaLib_BjEnNoLt (U_BjEnNoLt , BjIf.Ex, lessThanFlg, oDat.BjEn );
+    `ZionRiscvIsaLib_BjEnNoLessThan (U_BjEnNoLt , BjIf.Ex, lessThanFlg, oDat.BjEn );
     `ZionRiscvIsaLib_BjTgtAddr(U_BjTgtAddr, BjIf.Ex,              BjIf.BjTgtAddrOut);
     `gen_if(INT_MODULE_TYPE==0) 
         assign oDat.memAddr = (iDat.memEn)? addSubRslt : '0;
@@ -185,9 +185,9 @@ module ZionRiscvIsaLib_IntEx
       SltIf.unsignedFlg = unsignedFlg;
       SltIf.s1 = iDat.s1;
       SltIf.s2 = iDat.s2;
-      oDat.intRslt = BitsIf.rslt | SftIf.rslt | AddSubIf.addSubRslt | {{(CPU_WIDTH-1){1'b0}},{sltRslt}};
+      oDat.intRslt = BitsIf.rslt | SftIf.rslt | AddSubIf.addSubRslt | {{(CPU_WIDTH-1){1'b0}},{SltIf.rslt}};
     end
-    `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf.Ex,sltRslt);
+    `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf);
   end
 
 endmodule: ZionRiscvIsaLib_IntEx

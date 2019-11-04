@@ -34,7 +34,7 @@ interface ZionRiscvIsaLib_SftExItf
   logic [4+RV64:0]      s2;
 
   modport De (output op, s1, s2);
-  modport Ex (input  op, s1, s2, output rslt);
+  modport Ex (input  op, s1, s2);
 
 endinterface: ZionRiscvIsaLib_SftExItf
 `endif
@@ -58,21 +58,23 @@ endinterface: ZionRiscvIsaLib_SftExItf
 `ifdef ZionRiscvIsaLib_SftExec
   `__DefErr__(ZionRiscvIsaLib_SftExec)
 `else
-  `define ZionRiscvIsaLib_SftExec(UnitName,iSftExIf_MT)      \
-`ifdef VIVADO_SYN                                            \
-    localparam UnitName``_RV64 = iSftExIf_MT.RV64;           \
-  `else                                                      \
-    localparam UnitName``_RV64 = $bits(iSftExIf_MT.s1)/32-1; \
-  `endif                                                     \
-  ZionRiscvIsaLib_SftExec#(.RV64(UnitName``_RV64))           \
-                            UnitName(                        \
-                              .iSftExIf(iSftExIf_MT)         \
-                            )
+  `define ZionRiscvIsaLib_SftExec(UnitName,iSftExIf_MT,oRslt_MT)      \
+`ifdef VIVADO_SYN                                                     \
+    localparam UnitName``_RV64 = iSftExIf_MT.RV64;                    \
+  `else                                                               \
+    localparam UnitName``_RV64 = $bits(iSftExIf_MT.s1)/32-1;          \
+  `endif                                                              \
+  ZionRiscvIsaLib_SftExec#(.RV64(UnitName``_RV64))                    \
+                            UnitName(                                 \
+                              .iSftExIf(iSftExIf_MT),                 \
+                              .oRslt(oRslt_MT)                        \
+                            );
 `endif
 module ZionRiscvIsaLib_SftExec
 #(RV64 = 0
 )(
-  Disable_ZionRiscvIsaLib_SftExItf.Ex iSftExIf,
+  ZionRiscvIsaLib_SftExItf.Ex iSftExIf,
+  output logic  [$bits(iSftExIf.s1)-1:0] oRslt
 );
 /*
   logic sftL, sftR, sftA, sftW;
@@ -118,7 +120,7 @@ module ZionRiscvIsaLib_SftExec
     assign iSftExIf.rslt = (sftW)? sftWRslt : rsltTmp;
   end `gen_else begin
     assign sftDat = iSftExIf.s1;
-    assign iSftExIf.rslt = rsltTmp;
+    assign oRslt = rsltTmp;
   end
 
   MultiTypeShift U_MultiTypeShift(sftR,sftA,sftL,sftDat,sftBits,rsltTmp);
@@ -126,18 +128,18 @@ module ZionRiscvIsaLib_SftExec
   // Assertions for signal check.
   always_comb begin
     // There is no ShiftLeftArithmetic instruction, so sftA and sftL can not be activated simultaneously.
-    assert ($onehot0({sftA, sftL})) ; 
+    assert ($onehot0({sftA, sftL}))  
     else $error("Signal Error: Both of sftA and sftL are activated which only one could work at a certain time.");
   end
-  if(RV64=1) begin
+  if(RV64==1) begin
     always_comb begin
       // For ShiftW instructions(SLLW/SRLW/SRAW), the highest bit in SftExIf.s2 is not used. 
       // Thus this bit must be 0 for ShiftW.
-      assert ($onehot0({sftW, iSftExIf.s2[5]})) ; 
+      assert ($onehot0({sftW, iSftExIf.s2[5]})) 
       else $error("Signal Error: Both of sftA and sftL are activated which only one could work at a certain time.");
     end
   end
-
+endmodule: ZionRiscvIsaLib_SftExec
 module MultiTypeShift
 #(INPUT_DATA_WIDTH  = 32,
   SHIFT_BIT_WIDTH   = 5 ,
@@ -150,20 +152,20 @@ module MultiTypeShift
   input        [SHIFT_BIT_WIDTH  -1:0] iSftBit,
   output logic [OUTPUT_DATA_WIDTH-1:0] oDat
 );
+`Use_ZionBasicCircuitLib(Bc)
 
-  wire [INPUT_DATA_WIDTH-1:0] datReverse, sftDat, highBits, sftRsltTmp, rsltReverse;
+  logic [INPUT_DATA_WIDTH-1:0] datReverse, sftDat, highBits, sftRsltTmp, rsltReverse;
   always_comb begin
     datReverse  = {<<{iDat}};
     sftDat      = (iSftR?iDat:'0) | (iSftL?datReverse:'0); //TODO: change to mask.
-    highBits    = {INPUT_DATA_WIDTH{iSftA&sftDat[$high(sftDat)]}}; //TODO: use library
+    // highBits    = {INPUT_DATA_WIDTH{iSftA&sftDat[$high(sftDat)]}}; //TODO: use library
+    highBits    = {INPUT_DATA_WIDTH{iSftA&`BcHighB(sftDat)}};
     sftRsltTmp  = INPUT_DATA_WIDTH'({highBits,sftDat} >> iSftBit);
     rsltReverse = {<<{sftRsltTmp}};
     oDat        = (iSftR?sftRsltTmp:'0) | (iSftL?rsltReverse:'0); //TODO: change to mask.
   end
-
-endmodule : MultiTypeShift
-
-endmodule: ZionRiscvIsaLib_SftExec
+`Unuse_ZionBasicCircuitLib(Bc)
+endmodule: MultiTypeShift
 `endif
 
 //endsection: ShiftEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -43,7 +43,7 @@ interface ZionRiscvIsaLib_BitsExItf
   endfunction
 
   modport De (output andEn, orEn, xorEn, s1, s2);
-  modport Ex (input  andEn, orEn, xorEn, s1, s2, output rslt, import Exec);
+  modport Ex (input  andEn, orEn, xorEn, s1, s2, import Exec);
 
 endinterface: ZionRiscvIsaLib_BitsExItf
 `endif
@@ -67,16 +67,19 @@ endinterface: ZionRiscvIsaLib_BitsExItf
 `ifdef ZionRiscvIsaLib_BitsOpExec
   `__DefErr__(ZionRiscvIsaLib_BitsOpExec)
 `else
-  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT) \
-ZionRiscvIsaLib_BitsOpExec UnitName(.iBitsExif(iBitsExif_MT));
+  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT,oRslt_MT) \
+ZionRiscvIsaLib_BitsOpExec UnitName(.iBitsExif(iBitsExif_MT),        \
+                                    .oRslt(oRslt_MT)                 \
+                                    );
 `endif
 module ZionRiscvIsaLib_BitsOpExec
 (
-  ZionRiscvIsaLib_BitsExItf.Ex iBitsExif
+  ZionRiscvIsaLib_BitsExItf.Ex iBitsExif,
+  output logic [$bits(iBitsExif.s1)-1:0] oRslt
 );
 
   always_comb begin
-    iBitsExif.rslt   = iBitsExif.Exec();
+    oRslt   = iBitsExif.Exec();
   end
 
   // Only one kind of operation can be done in a certain cycle. If more than 1 'xxEn' signals are acctivated,
