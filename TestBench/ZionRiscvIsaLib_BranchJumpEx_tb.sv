@@ -10,8 +10,8 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
   logic                 equal;
   logic [1:0]           linkOffset;           
   logic                 LessThan;
-  logic [1:0]           BjEnrslt;
-  logic [1:0]           BjEnout;
+  logic                 BjEnrslt;
+  logic                 BjEnout;
   logic [1:0]           BjEnNoLessThanrslt;
   logic [2:0]           OpSel;
   logic [CPU_WIDTH-1:0] tgtAddrout;
@@ -30,7 +30,7 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
 
   initial begin
       OpSel     = 0;
-      offsel    = 0;
+      //offsel    = 0;
       iBjEx.pc  = 0;
       iBjEx.s1  = 0;
       iBjEx.s2  = 0;
@@ -63,9 +63,17 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
   	case(offsel)
   		 'd0:   linkOffset = 2'b01;  
   		 'd1:   linkOffset = 2'b10;
-     default: linkOffset = 2'b00;
+     //full_case
   	endcase // offsel
   end
+
+  always_comb begin 
+   if (iBjEx.jump)
+    iBjEx.linkOffset = linkOffset;
+   else  
+    iBjEx.linkOffset = 'd0;
+  end
+
   always_comb begin
   	case({iBjEx.bjEn,iBjEx.branch,iBjEx.beq,iBjEx.bne,iBjEx.blt,iBjEx.bge,iBjEx.jump})
   		 'b100_0001: tgtAddrout = iBjEx.s1 + iBjEx.offset;
@@ -95,17 +103,17 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
    end
 
   always_comb begin
-  	equal      = (iBjEx.s1 == iBjEx.s2);
-  	BjEnout[1] =  iBjEx.jump                   
-              |(iBjEx.beq &  equal)           
-              |(iBjEx.bne & !equal);         
-    BjEnout[0] = (iBjEx.blt &  LessThan)       
+  	equal    = (iBjEx.s1 == iBjEx.s2);
+    BjEnout  = iBjEx.jump 
+              |(iBjEx.beq & equal)
+              |(iBjEx.bne & !equal) 
+              |(iBjEx.blt &  LessThan)       
               |(iBjEx.bge & !LessThan);      
   end
 
-  assign LinkPcout = (iBjEx.jump) ? iBjEx.pc+4 : iBjEx.pc+2;
+  assign LinkPcout = (iBjEx.jump) ? iBjEx.pc + {linkOffset,1'b0} : 'd0;
   
-  assign s1Fnlout  = (iBjEx.jump) ? 'b100: (~iBjEx.s1 |'b100);
+  assign s1Fnlout  = (iBjEx.jump) ? {29'd0,linkOffset,1'b0} : iBjEx.s1 ;
    
  initial begin
    forever @(posedge clk) begin
@@ -160,7 +168,7 @@ module ZionRiscvIsaLib_BranchJumpEx_tb;
  initial begin
    $fsdbDumpfile("tb.fsdb");
    $fsdbDumpvars(0,ZionRiscvIsaLib_BranchJumpEx_tb,"+all");
-   #500 $finish;
+   #50000 $finish;
  end 
 
  `RviBjTgtAddr (U_BjTgtAddr,iBjEx,tgtAddr); 

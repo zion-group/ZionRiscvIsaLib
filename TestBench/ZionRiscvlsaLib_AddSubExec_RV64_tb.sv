@@ -8,6 +8,7 @@ module ZionRiscvlsaLib_AddSubExec_RV64_tb;
   logic [1:0]           OpSel;
   logic [CPU_WIDTH-1:0] addsubout;
   logic [CPU_WIDTH-1:0] outtmp;
+  logic [CPU_WIDTH-1:0] rslt;
   logic                 lessthanout;
   logic                 lessthanrslt;
   logic                 unsignedFlg;
@@ -82,11 +83,11 @@ module ZionRiscvlsaLib_AddSubExec_RV64_tb;
   initial begin
     forever @(posedge clk) begin
       #(half_period/5);
-      if (AddSubEx.op[0] && AddSubEx.rslt != addsubout) begin
-        $error("add rslt error,%0d != %0d",AddSubEx.rslt,addsubout);
+      if (AddSubEx.op[0] && rslt != addsubout) begin
+        $error("add rslt error,%0d != %0d",rslt,addsubout);
         $finish;
-      end else if (AddSubEx.op[1] && AddSubEx.rslt != addsubout) begin 
-        $error("sub rslt error, %0d != %0d",AddSubEx.rslt,addsubout);
+      end else if (AddSubEx.op[1] && rslt != addsubout) begin 
+        $error("sub rslt error, %0d != %0d",rslt,addsubout);
         $finish;
       end
     end 
@@ -108,7 +109,7 @@ module ZionRiscvlsaLib_AddSubExec_RV64_tb;
     #500 $finish;
   end 
 
-  `RviAddSubExec (U_AddSubExec,AddSubEx);
+  `RviAddSubExec (U_AddSubExec,AddSubEx,rslt);
   `RviAddSubLessThan(U_AddSubLessThan,AddSubEx,unsignedFlg,AddSubEx.rslt[$high(AddSubEx.rslt)],lessthanrslt);
 `Unuse_ZionRiscvIsaLib(Rvi)
 endmodule : ZionRiscvlsaLib_AddSubExec_RV64_tb
