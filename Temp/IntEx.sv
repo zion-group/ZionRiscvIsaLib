@@ -39,18 +39,19 @@ interface ZionRiscvIsaLib_IntInsExItf
   logic sltEn, bjEn, branch, beq, bne, blt, bge, jump;
   logic sftLeft, sftRight, sftA;
   logic memEn;
-  logic [1:0] BjEn, linkOffset;
+  logic BjEn;
+  logic [1:0] linkOffset;
   logic [CPU_WIDTH-1:0] intRslt, BjTgt, memAddr;
 
   // modport for integer instructions excution with branch&jump and memory address calculate.
   modport IntBjMemDeOut (output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                                 sftLeft, sftRight, sftA, sltEn,
-                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, 
+                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset, 
                                 memEn
                         );
   modport IntBjMemExIn  (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                                 sftLeft, sftRight, sftA, sltEn,
-                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump,
+                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset,
                                 memEn
                         );
   modport IntBjMemExOut(output  intRslt, BjEn, BjTgt, memAddr);
@@ -58,11 +59,11 @@ interface ZionRiscvIsaLib_IntInsExItf
   // modport for integer instructions excution with branch&jump.
   modport IntBjDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                             sftLeft, sftRight, sftA, sltEn,
-                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump
+                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset
                     );
   modport IntBjExIn (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                             sftLeft, sftRight, sftA, sltEn,
-                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump
+                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump ,linkOffset
                     );
   modport IntBjExOut(output  intRslt, BjEn, BjTgt);
 
@@ -108,10 +109,17 @@ module ZionRiscvIsaLib_IntEx
   ZionRiscvIsaLib_IntInsExItf iDat,
   ZionRiscvIsaLib_IntInsExItf oDat
 );
+`Use_ZionBasicCircuitLib(Bc)
 
   localparam CPU_WIDTH = 32*(RV64+1);
   logic sltRslt;
   wire unsignedFlg = iDat.flags[0];
+  logic                 SltRslt;
+  logic [CPU_WIDTH-1:0] BitsRslt;
+  logic [CPU_WIDTH-1:0] SftRslt;
+  logic [CPU_WIDTH-1:0] addSubRslt;
+  logic [CPU_WIDTH-1:0] S1LinkOffsetMuxRlst;
+  logic [CPU_WIDTH-1:0] BjTgtAddrRlst;
   ZionRiscvIsaLib_BitsExItf#(RV64) BitsIf();
   ZionRiscvIsaLib_SftExItf#(RV64) SftIf();
   ZionRiscvIsaLib_AddSubExItf#(RV64) AddSubIf();
@@ -141,17 +149,18 @@ module ZionRiscvIsaLib_IntEx
     end
   end
 
-  `ZionRiscvIsaLib_BitsOpExec (U_BitsOpExec, BitsIf.Ex  );
-  `ZionRiscvIsaLib_SftExec    (U_SftExec   , SftIf);
-  `ZionRiscvIsaLib_AddSubExec (U_AddSubExec, AddSubIf);
+  `ZionRiscvIsaLib_BitsOpExec (U_BitsOpExec, BitsIf.Ex , BitsRslt);
+  `ZionRiscvIsaLib_SftExec    (U_SftExec   , SftIf , SftRslt);
+  `ZionRiscvIsaLib_AddSubExec (U_AddSubExec, AddSubIf , addSubRslt);
 
   `gen_if(INT_MODULE_TYPE==0 | INT_MODULE_TYPE==1) begin: IntModuleType_0_1
-    wire [CPU_WIDTH-1:0] addSubRslt = AddSubIf.rslt;
-    wire lessThanFlg = addSubRslt[$high(addSubRslt)]; //TODO: use HighB
-    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, BjIf.S1MuxOut);
+    // wire [CPU_WIDTH-1:0] addSubRslt = AddSubIf.rslt;
+    // wire lessThanFlg = addSubRslt[$high(addSubRslt)]; //TODO: use HighB
+    wire lessThanFlg = `BcHighB(addSubRslt);
+    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, S1LinkOffsetMuxRlst);
     ZionRiscvIsaLib_BjExItf#(RV64) BjIf();
     always_comb begin
-      AddSubIf.s1    = BjIf.s1Fnl;
+      AddSubIf.s1    = S1LinkOffsetMuxRlst;
 
       BjIf.bjEn        = iDat.bjEn;
       BjIf.branch      = iDat.branch;
@@ -167,14 +176,16 @@ module ZionRiscvIsaLib_IntEx
       BjIf.s2          = iDat.s2;
       BjIf.offset      = iDat.offset;
 
-      oDat.intRslt = BitsIf.rslt  | ({$bits(addSubRslt){iDat.addSubIns}} & addSubRslt)  //TODO: use mask
-                    |SftIf.rslt   | {{(CPU_WIDTH-1){1'b0}},{sltRslt & iDat.sltEn}};//TODO: use ZeroExtd
-      oDat.BjTgt   = BjIf.tgtAddr;
+      // oDat.intRslt = BitsRslt  | ({$bits(addSubRslt){iDat.addSubIns}} & addSubRslt)  //TODO: use mask
+      //               |SftRslt   | {{(CPU_WIDTH-1){1'b0}},{sltRslt & iDat.sltEn}};//TODO: use ZeroExtd
+      oDat.intRslt = BitsRslt  | `BcMaskM(iDat.addSubIns,addSubRslt) | `BcMaskM(iDat.jump,addSubRslt)
+                    |SftRslt   | `BcZeroExtdM((sltRslt & iDat.sltEn),CPU_WIDTH);
+      oDat.BjTgt   = BjTgtAddrRlst;
     end
-    `ZionRiscvIsaLib_AddSubLessThan (U_AddSubLessThan, AddSubIf.Ex, unsignedFlg, lessThanFlg, sltRslt);
+    `ZionRiscvIsaLib_AddSubLessThan (U_AddSubLessThan, AddSubIf, unsignedFlg, lessThanFlg, sltRslt);
     `ZionRiscvIsaLib_BjEnNoLessThan (U_BjEnNoLt , BjIf.Ex, lessThanFlg, oDat.BjEn );
-    `ZionRiscvIsaLib_BjTgtAddr(U_BjTgtAddr, BjIf.Ex,              BjIf.BjTgtAddrOut);
-    `gen_if(INT_MODULE_TYPE==0) 
+    `ZionRiscvIsaLib_BjTgtAddr(U_BjTgtAddr, BjIf.Ex,              BjTgtAddrRlst);
+    `gen_if(INT_MODULE_TYPE==0)  
         assign oDat.memAddr = (iDat.memEn)? addSubRslt : '0;
   end
   `gen_elif(INT_MODULE_TYPE==2) begin: IntModuleType_2
@@ -185,11 +196,11 @@ module ZionRiscvIsaLib_IntEx
       SltIf.unsignedFlg = unsignedFlg;
       SltIf.s1 = iDat.s1;
       SltIf.s2 = iDat.s2;
-      oDat.intRslt = BitsIf.rslt | SftIf.rslt | AddSubIf.addSubRslt | {{(CPU_WIDTH-1){1'b0}},{SltIf.rslt}};
+      oDat.intRslt = BitsRslt | SftRslt | addSubRslt | {{(CPU_WIDTH-1){1'b0}},{SltRslt}};
     end
-    `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf);
+    `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf,SltRslt);
   end
-
+`Unuse_ZionBasicCircuitLib(Bc)
 endmodule: ZionRiscvIsaLib_IntEx
 
 //endsection: IntEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

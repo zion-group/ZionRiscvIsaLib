@@ -78,15 +78,15 @@ interface ZionRiscvIsaLib_BjExItf
   // But it is implemented by 'bit or' for high bits. So it has a better performance.
   function automatic logic [CPU_WIDTH-1:0] S1LinkOffsetMux;
     logic [CPU_WIDTH-1:0] s1Mask, muxRslt;
-    s1Mask = (~(s1|{$bits(s1){jump}}));
+    s1Mask = `BcMaskM((~jump),s1);
     muxRslt[CPU_WIDTH-1:3] = s1Mask[CPU_WIDTH-1:3];
     muxRslt[2:1] = s1Mask[2:1] | linkOffset;
     muxRslt[ 0 ] = s1Mask[ 0 ];
     return muxRslt;
   endfunction : S1LinkOffsetMux
 
-  modport De( output bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset);
-  modport Ex( input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset,
+  modport De( output bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset);
+  modport Ex( input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset,
               import LessThan
             );
   // modport BjTgtAddrOut (output tgtAddr);
@@ -163,16 +163,16 @@ module ZionRiscvIsaLib_BjEnNoLessThan
 (
   ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
   input                      iLessThan,
-  output logic [1:0]         oBjEn
+  output logic               oBjEn
 );
 
   logic equal;
   always_comb begin
     equal    = (iBjExIf.s1 == iBjExIf.s2);
-    oBjEn[1] =  iBjExIf.jump                   // jump instuction lead to branch&jump
-              |(iBjExIf.beq & equal)           // Beq  instuction lead to branch&jump
-              |(iBjExIf.bne & !equal);         // Bne  instuction lead to branch&jump
-    oBjEn[0] = (iBjExIf.blt & iLessThan)       // Blt  instuction lead to branch&jump
+    oBjEn    = iBjExIf.jump 
+              |(iBjExIf.beq & equal)
+              |(iBjExIf.bne & !equal) 
+              |(iBjExIf.blt & iLessThan)       // Blt  instuction lead to branch&jump
               |(iBjExIf.bge & !iLessThan);     // Bge  instuction lead to branch&jump
   end
 
@@ -209,7 +209,7 @@ endmodule: ZionRiscvIsaLib_BjEnNoLessThan
 module ZionRiscvIsaLib_BjEnGen
 (
   ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
-  output logic [1:0]         oBjEn
+  output logic               oBjEn
 );
 
   logic lessThan;
@@ -219,7 +219,7 @@ module ZionRiscvIsaLib_BjEnGen
   ZionRiscvIsaLib_BjEnNoLessThan  U_ZionRiscvIsaLib_BjEnNoLessThan(
                                     .iBjExIf,
                                     .iLessThan(lessThan),
-                                    .oBjEn
+                                    .oBjEn(bjEn)
                                   );
 
 endmodule: ZionRiscvIsaLib_BjEnGen

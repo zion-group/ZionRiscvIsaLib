@@ -82,7 +82,7 @@ endinterface: ZionRiscvIsaLib_SltExItf
 module ZionRiscvIsaLib_SetLessThan
 (
   ZionRiscvIsaLib_SltExItf.Ex iSltExIf,
-  output logic  [$bits(iSltExIf.s1)-1:0] oRslt
+  output logic oRslt
 );
 
   always_comb begin
