@@ -29,7 +29,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   logic [4:0] opHigh;
   logic [1:0] opLow ;
   logic [4:0] rs1, rs2, rd;
-  logic [CPU_WIDTH-1:0] shamt, immItype, immStype, immBtype, immUtype, immJtype;
+  logic [CPU_WIDTH-1:0] shamt, immItype, immStype, immBtype, immUtype, immJtype, uimm;
   always_comb begin
     {funct7,rs2,rs1,funct3,rd,opHigh,opLow} =ins;
     immItype = unsigned'(type_Signed'({ins[31:20]}));
@@ -44,7 +44,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   logic [7:0] f3Oh;
   logic f7h6_000000, f7h6_010000, f7_0000000, f7_0000001, f7_0100000;
   always_comb begin
-    foreach(f3Oh) f3Oh[i] = (funct3 == i);
+    foreach(f3Oh[i])  f3Oh[i] = (funct3 == i);
     f7h6_000000 = (funct7[6:1] == 6'b000000);
     f7h6_010000 = (funct7[6:1] == 6'b010000);
     f7_0000000  = f7h6_000000 & ~funct7[0];
@@ -55,7 +55,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   logic notRvc, bigImmInsFlg, opHigh_110xx, bjInsFlg, jumpInsFlg, branchInsFlg;
   logic loadStoreInsFlg, loadInsFlg, storeInsFlg;
   logic intInsFlg, intImmInsFlg, intRs2InsFlg, wInsFLg;
-  logic sysInsFlg, atomicInsFlg, fenceInsFlg;
+  logic wInsFlg,sysInsFlg, atomicInsFlg, fenceInsFlg;
   always_comb begin
     notRvc          = (opLow==2'b11);                  // whether it's RVC instructions. 0-RVC ins.  1-Not RVC ins.
     bigImmInsFlg    = (opHigh ==? 5'b0?101) & notRvc;  // big immediate operand instructions: LUI, AUIPC
@@ -118,7 +118,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   // Big immediate operand instructions: LUI, AUIPC 
   function automatic logic BigImmIns();
     return (bigImmInsFlg);
-  endfunction: bigImmIns
+  endfunction: BigImmIns
 
   function automatic logic Lui(); // LUI valid
     return (bigImmInsFlg & opHigh[3]);
@@ -132,7 +132,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   // Branch and jump instructions: JAL, JALR, BEQ, BNE, BLT[U], BGE[U]
   function automatic logic BranchJumpIns(); // Branch or jump instructions valid
-    return (bjIns);
+    return (bjInsFlg);
   endfunction: BranchJumpIns
 
   // Jump instructions--------------------------------------------------------------------------------------------------
@@ -202,7 +202,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 
   function automatic logic[1:0] LoadStoreWidth(); // Operation width of load of store
     return ({2{loadStoreInsFlg}} & funct3[1:0]);  // 00-Byte     01-Half word     10-Word     11-Double word
-  endfunction:
+  endfunction:LoadStoreWidth
 
   // Load instructions--------------------------------------------------------------------------------------------------
   function automatic logic LoadIns(); // Load instructions valid
@@ -323,7 +323,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 
   function automatic logic XorIns(); // XOR[I] valid
     return (f3Oh[4] & (intNoWImmInsFlg | simpleIntNoWRs2InsFlg));
-  endfunction: Xor
+  endfunction: XorIns
 
   function automatic logic Xor(); // XOR valid
     return (f3Oh[4] & simpleIntNoWRs2InsFlg);
@@ -360,11 +360,11 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   // Shift instructions-------------------------------------------------------------------------------------------------
   // SLL[I][W], SRL[I][W], SRA[I][W]
   function automatic logic SftIns(); // Shift instructions valid
-    return ((op[1:0]==2'b01) & ((intImmInsFlg) | (intRs2InsFlg & (f7_0000000 | f7_0100000))));
+    return ((funct3[1:0]==2'b01) & ((intImmInsFlg) | (intRs2InsFlg & (f7_0000000 | f7_0100000))));
   endfunction: SftIns
 
   function automatic logic SftWIns(); // W type shift valid: SLL[I]W, SRL[I]W, SRA[I]W
-    return ((op[1:0]==2'b01) & ((intWImmInsFlg) | (intWRs2InsFlg & (f7_0000000 | f7_0100000))));
+    return ((funct3[1:0]==2'b01) & ((intWImmInsFlg) | (intWRs2InsFlg & (f7_0000000 | f7_0100000))));
   endfunction: SftWIns
 
   function automatic logic SllIns(); // Shift left instructions valid
@@ -477,7 +477,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 
   function automatic logic Slti(); // SLTI valid
     return (f3Oh[2] & intNoWImmInsFlg);
-  endfunction: Slt
+  endfunction: Slti
 
   function automatic logic Sltiu(); // SLTIU valid
     return (f3Oh[3] & intNoWImmInsFlg);
@@ -639,6 +639,831 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
 
 endinterface: ZionRiscvIsaLib_RvimazDecodeItf
 `endif
+
+
+
+//section: AddSubEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits about Add and Sub instructions are provided in this section.
+// These circuits also could be reused to calculate memory address or do less than operation.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface name : ZionRiscvIsaLib_AddSubExItf
+// Author         : Wenheng Ma
+// Date           : 2019-10-24
+// Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32.
+// Description    :
+//   Define signals that ADD and SUB ISA nead.
+//   It contains 6 instructions: ADD/ADDI, ADDW/ADDIW, SUB, SUBW.
+//   Note that, for efficient architecture design, some other instruction may reuse the Adder. For example, memory
+//   address could be calculated by the 'add' and 'less than' could be done by the 'sub'.
+//   In the code, op indicate the operation type:
+//     op[0] = add,     op[1] = sub,      op[2] = .W (only for R64I)
+//   The interface could also be used to calculate the result of 'less than' compare by the LessThan function. 
+//     - 'less than' is used in 8 instructions: BLT[U], BGE[U], BLT[I][U]
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+`ifndef Disable_ZionRiscvIsaLib_AddSubExItf
+interface  ZionRiscvIsaLib_AddSubExItf
+#(RV64 = 0);
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic [RV64     +1:0] op;
+  logic [CPU_WIDTH-1:0] s1,s2,rslt;
+
+  // TODO: add comments
+  function automatic logic AddSubLessThan(input unsignedFlg, cmpRsltSign); 
+    return ((unsignedFlg && (s1[$high(s1)] ^ s2[$high(s2)]))? s2[$high(s2)] : cmpRsltSign);
+  endfunction : AddSubLessThan
+
+  modport De (output op, s1, s2);
+  modport Ex (input  op, s1, s2);
+  modport LessThan (input s1, s2, import AddSubLessThan);
+
+endinterface : ZionRiscvIsaLib_AddSubExItf
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_AddSubExec
+// Author      : Wenheng Ma
+// Date        : 2019-10-24
+// Version     : 1.0
+// Parameter   :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iAddSubExIf.
+// Description :
+//   Calculate addition or subtraction according to the op.
+//   iAddSubExIf.op indicate the operation type.
+//     op[0] = add,     op[1] = sub,      op[2] = .W (only for R64I)
+//   Note that, add and sub can be activated at the same time. That will lead to an undefined result.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_AddSubExec
+`ifdef ZionRiscvIsaLib_AddSubExec
+  `__DefErr__(ZionRiscvIsaLib_AddSubExec)
+`else
+  `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT,oRslt_MT)   \
+`ifdef VIVADO_SYN                                                        \
+    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                    \
+  `else                                                                  \
+    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;          \
+  `endif                                                                 \
+  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64))                    \
+                            UnitName(                                    \
+                              .iAddSubExIf(iAddSubExIf_MT),              \
+                              .oRslt(oRslt_MT)                           \
+                            );
+`endif
+module ZionRiscvIsaLib_AddSubExec
+#(RV64 = 0
+)(
+  ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
+  output logic [$bits(iAddSubExIf.s1)-1:0] oRslt
+);
+ `Use_ZionBasicCircuitLib(Bc)
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic [CPU_WIDTH-1:0] s1, s1Tmp, s2, s2Tmp, rsltTmp;
+  wire addEn = iAddSubExIf.op[0];
+  wire subEn = iAddSubExIf.op[1];
+  always_comb begin
+    s1      = iAddSubExIf.s1;
+    s2      = iAddSubExIf.s2;
+    rsltTmp = `BcAddSubdM(addEn,subEn,s1,s2);
+  end
+  `gen_if(RV64) begin : Rv64RsltGen
+    wire WFlg = iAddSubExIf.op[2];
+    assign oRslt = (WFlg) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
+  end `gen_else begin : Rv32RsltGen
+    assign oRslt = rsltTmp;
+  end
+
+  // Only one kind of operation can be done in a certain cycle. If both of addEn(iAddSubExIf.op[0])
+  // and subEn(iAddSubExIf.op[1]) is 1, the result will be undifined and lead to an error. So it is
+  // necessary to assert the situation.
+ always_comb begin
+    assert ($onehot0({addEn, subEn}))
+    else $error("Signal Error: Both of addEn and subEn are activated which only one could work at a certain time.");
+  end
+
+ `Unuse_ZionBasicCircuitLib(Bc)
+endmodule : ZionRiscvIsaLib_AddSubExec
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_AddSubLessThan
+// Author      : Wenheng Ma
+// Date        : 2019-10-24
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Calculate less than flag according to the subtraction result(the highest bit). 
+//   Less than operation could convert to a subtraction. So it can reuse the ZionRiscvIsaLib_AddSubExec module.
+//   When use the subtractor, we need to deal with the unsigned less than operation which is done by this module.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_AddSubLessThan
+`ifdef ZionRiscvIsaLib_AddSubLessThan
+  `__DefErr__(ZionRiscvIsaLib_AddSubLessThan)
+`else
+  `define ZionRiscvIsaLib_AddSubLessThan(UnitName,iAddSubExIf_MT,iUnsignedFlg_MT,iCmpRsltSign_MT,oLessThan_MT) \
+ZionRiscvIsaLib_AddSubLessThan  UnitName(                                                                      \
+                                    .iAddSubExIf(iAddSubExIf_MT),                                              \
+                                    .iUnsignedFlg(iUnsignedFlg_MT),                                            \
+                                    .iCmpRsltSign(iCmpRsltSign_MT),                                            \
+                                    .oLessThan(oLessThan_MT)                                                   \
+                                  );
+`endif
+module ZionRiscvIsaLib_AddSubLessThan
+(
+  ZionRiscvIsaLib_AddSubExItf.LessThan iAddSubExIf,
+  input iUnsignedFlg,
+  input iCmpRsltSign,
+  output logic oLessThan
+);
+
+  always_comb begin
+    oLessThan = iAddSubExIf.AddSubLessThan(iUnsignedFlg,iCmpRsltSign);
+  end
+
+endmodule : ZionRiscvIsaLib_AddSubLessThan
+`endif
+
+//endsection: AddSubEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+//section: BitOperationEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits about bit operation instructions are provided in this section.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface name : ZionRiscvIsaLib_BitsExItf
+// Author         : Wenheng Ma
+// Date           : 2019-08-02
+// Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
+// Description    :
+//   Define signals that bit operation ISA nead. And offer an Excution function to get the bit operation result.
+//   Bit operation contains 6 instructions: AND/ANDI, OR/ORI, XOR/XORI.
+//   Note that, for efficient architecture design, some other instructions could convert to bit operation. For example,
+//   LUI only place a U-type immediate into the highest bit of regfile. Thus the fixed shift could be done in Decode,
+//   and do an 'or' operation with 0.
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+`ifndef Disable_ZionRiscvIsaLib_BitsExItf
+interface ZionRiscvIsaLib_BitsExItf
+#(RV64 = 0);
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic andEn, orEn, xorEn;
+  logic [CPU_WIDTH-1:0] s1, s2, rslt;
+
+  // Get bit operation result. If more than 1 'xxEn' signals are acctivated, the result will be 
+  // undifined and lead to an error.
+  function automatic logic [CPU_WIDTH-1:0] Exec();
+    logic [CPU_WIDTH-1:0] rslt;
+    unique case (1'b1)
+      andEn  : rslt = (s1 & s2); // and calculation
+      orEn   : rslt = (s1 | s2); // or  calculation
+      xorEn  : rslt = (s1 ^ s2); // xor calculation
+      default: rslt = '0;
+    endcase
+    return rslt;
+  endfunction
+
+  modport De (output andEn, orEn, xorEn, s1, s2);
+  modport Ex (input  andEn, orEn, xorEn, s1, s2, import Exec);
+
+endinterface: ZionRiscvIsaLib_BitsExItf
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_BitsOpExec
+// Author      : Wenheng Ma
+// Date        : 2019-10-24
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Calculate all bit operations. Only one signal in iBitsExif.andEn, iBitsExif.orEn and iBitsExif.xorEn can be 1.
+//   If two or three of these 'En' signals are 1, the result are undefined.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-24 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_BitsOpExec
+`ifdef ZionRiscvIsaLib_BitsOpExec
+  `__DefErr__(ZionRiscvIsaLib_BitsOpExec)
+`else
+  `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT,oRslt_MT) \
+ZionRiscvIsaLib_BitsOpExec UnitName(.iBitsExif(iBitsExif_MT),        \
+                                    .oRslt(oRslt_MT)                 \
+                                    );
+`endif
+module ZionRiscvIsaLib_BitsOpExec
+(
+  ZionRiscvIsaLib_BitsExItf.Ex iBitsExif,
+  output logic [$bits(iBitsExif.s1)-1:0] oRslt
+);
+
+  always_comb begin
+    oRslt   = iBitsExif.Exec();
+  end
+
+  // Only one kind of operation can be done in a certain cycle. If more than 1 'xxEn' signals are acctivated,
+  // the result will be undifined and lead to an error. So it is necessary to assert the situation.
+  always_comb begin
+    assert($onehot0({iBitsExif.andEn, iBitsExif.orEn, iBitsExif.xorEn})) 
+    else $error("Signal Error: More than 1 'xxEn' signals are activated in iBitsExif.andEn, iBitsExif.orEn and iBitsExif.xorEn which only one could work.");
+  end
+
+endmodule: ZionRiscvIsaLib_BitsOpExec
+`endif
+
+//section: BitOperationEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+//section: BranchJumpEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits about Branch and Jump instructions are provided in this section.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface name : ZionRiscvIsaLib_BjExItf
+// Author         : Wenheng Ma
+// Date           : 2019-10-27
+// Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
+// Description    :
+//   Define signals that branch and jump nead. And offer an Excution function to help getting the result.
+//   Details for each function is described below:
+//     TgtAddrGen      : Calculate the target address for branch and jump instructions.
+//     LessThan        : Calculate less than operation for BLT and BGE instructions.
+//     LinkPcGen       : Calculate link PC for jump instructions. 
+//                       It could be omitted, if reuse the adder in ADD instruction.
+//     S1LinkOffsetMux : To reuse adder for link PC calculation, s1 must be link offset instead of normal s1.
+//                       This fuction implement a high-performance mux.
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-27 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+`ifndef Disable_ZionRiscvIsaLib_BjExItf
+interface ZionRiscvIsaLib_BjExItf
+#(RV64 = 0);
+ `Use_ZionBasicCircuitLib(Bc)
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump;
+  logic [1:0] linkOffset;
+  logic [CPU_WIDTH-1:0] pc, s1, s2, offset, tgtAddr, linkPc, s1Fnl;
+
+  // Calculate branch&jump target address.
+  // For Jal instruction, the PC must put into s1 before execution.
+  function automatic logic [CPU_WIDTH-1:0] TgtAddrGen;
+
+    logic [CPU_WIDTH-1:0] baseAddr, tgtOffset;
+    baseAddr  =  `BcMaskM(branch,pc)     
+                |`BcMaskM(jump,s1);      
+    tgtOffset =  `BcMaskM(bjEn,offset);  
+    return (baseAddr + tgtOffset);
+
+  endfunction : TgtAddrGen
+
+  // Calculate less than for Blt Bge instructions.
+  // Extend data according to unsigned flag(unsignedFlg), then compare the size of s1 and s2.
+  // With the extension of data, we can reuse the compare circuits for both signed and unsigned compare operations.
+  function automatic logic LessThan;
+
+    logic signed [CPU_WIDTH:0] s1Extd, s1Mask, s2Extd, s2Mask;
+    // s1Extd = {((~unsignedFlg) & s1[CPU_WIDTH-1]) , s1}; // Extend s1 according unsignedFld // TODO: use HighBit
+    // s2Extd = {((~unsignedFlg) & s2[CPU_WIDTH-1]) , s2}; // Extend s2 according unsignedFld// TODO: use HighBit
+    // s1Mask = {$bits(s1Extd){branch}} & s1Extd; // TODO: use Mask
+    // s2Mask = {$bits(s2Extd){branch}} & s2Extd; // TODO: use Mask
+    s1Extd = {((~unsignedFlg) & `BcHighB(s1)) , s1}; 
+    s2Extd = {((~unsignedFlg) & `BcHighB(s2)) , s2};
+    s1Mask =`BcMaskM(branch,s1Extd);
+    s1Mask =`BcMaskM(branch,s2Extd);
+    return ((s1Mask<s2Mask)? 1'b1:1'b0);
+
+  endfunction : LessThan
+
+  // Calculate the link pc. 
+  function automatic logic [CPU_WIDTH-1:0] LinkPcGen; 
+    return (`BcMaskM(jump,pc) + ({linkOffset,1'b0}));
+  endfunction : LinkPcGen
+
+  // To reuse adder for generating link pc, the function works as a mux that selects s1 or link offset.
+  // But it is implemented by 'bit or' for high bits. So it has a better performance.
+  function automatic logic [CPU_WIDTH-1:0] S1LinkOffsetMux;
+    logic [CPU_WIDTH-1:0] s1Mask, muxRslt;
+    s1Mask = `BcMaskM((~jump),s1);
+    muxRslt[CPU_WIDTH-1:3] = s1Mask[CPU_WIDTH-1:3];
+    muxRslt[2:1] = s1Mask[2:1] | linkOffset;
+    muxRslt[ 0 ] = s1Mask[ 0 ];
+    return muxRslt;
+  endfunction : S1LinkOffsetMux
+
+  modport De( output bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset);
+  modport Ex( input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset,
+              import LessThan
+            );
+  `Unuse_ZionBasicCircuitLib(Bc)
+endinterface : ZionRiscvIsaLib_BjExItf
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_BjTgtAddr
+// Author      : Wenheng Ma
+// Date        : 2019-10-28
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Target address generator for branch and jump instructions.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-28 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_BjTgtAddr
+`ifdef ZionRiscvIsaLib_BjTgtAddr
+  `__DefErr__(ZionRiscvIsaLib_BjTgtAddr)
+`else
+  `define ZionRiscvIsaLib_BjTgtAddr(UnitName,iBjExIf_MT,oTgtAddr_MT)   \
+ZionRiscvIsaLib_BjTgtAddr UnitName(                                    \
+                              .iBjExIf(iBjExIf_MT),                    \
+                              .oTgtAddr(oTgtAddr_MT)                   \
+                            );
+`endif
+module ZionRiscvIsaLib_BjTgtAddr
+(
+  ZionRiscvIsaLib_BjExItf iBjExIf,
+  output logic [$bits(iBjExIf.s1)-1:0] oTgtAddr
+);
+
+  always_comb begin
+    oTgtAddr  = iBjExIf.TgtAddrGen();
+  end
+
+endmodule: ZionRiscvIsaLib_BjTgtAddr
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_BjEnNoLessThan
+// Author      : Wenheng Ma
+// Date        : 2019-10-28
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Calculate branch & jump enable signal. It only evaluate the 'equal' and 'not equal'. All 'less than' is 
+//   evaluated by other circuits and passed in by 'iLessThan'.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-28 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_BjEnNoLessThan
+`ifdef ZionRiscvIsaLib_BjEnNoLessThan
+  `__DefErr__(ZionRiscvIsaLib_BjEnNoLessThan)
+`else
+  `define ZionRiscvIsaLib_BjEnNoLessThan(UnitName,iBjExIf_MT,iLessThan_MT,oBjEn_MT) \
+  ZionRiscvIsaLib_BjEnNoLessThan  UnitName(                                         \
+                              .iBjExIf(iBjExIf_MT),                                 \
+                              .iLessThan(iLessThan_MT),                             \
+                              .oBjEn(oBjEn_MT)                                      \
+                            );
+`endif
+module ZionRiscvIsaLib_BjEnNoLessThan
+(
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
+  input                      iLessThan,
+  output logic               oBjEn
+);
+
+  logic equal;
+  always_comb begin
+    equal    = (iBjExIf.s1 == iBjExIf.s2);
+    oBjEn    = iBjExIf.jump 
+              |(iBjExIf.beq & equal)
+              |(iBjExIf.bne & !equal) 
+              |(iBjExIf.blt & iLessThan)       // Blt  instuction lead to branch&jump
+              |(iBjExIf.bge & !iLessThan);     // Bge  instuction lead to branch&jump
+  end
+
+  //TODO: add assert
+
+endmodule: ZionRiscvIsaLib_BjEnNoLessThan
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_BjEnGen
+// Author      : Wenheng Ma
+// Date        : 2019-10-28
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Calculate the entire branch&jump enable without other input. If you need to design a high-performance core or
+//   place branch&jump interface in a individual module without other instructions, please use this module.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-28 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_BjEnGen
+`ifdef ZionRiscvIsaLib_BjEnGen
+  `__DefErr__(ZionRiscvIsaLib_BjEnGen)
+`else
+  `define ZionRiscvIsaLib_BjEnGen(UnitName,iBjExIf_MT,oBjEn_MT) \
+  ZionRiscvIsaLib_BjEnGen UnitName(                             \
+                                .iBjExIf(iBjExIf_MT),           \
+                                .oBjEn(oBjEn_MT)                \
+                              );
+`endif
+module ZionRiscvIsaLib_BjEnGen
+(
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
+  output logic               oBjEn
+);
+
+  logic lessThan;
+  always_comb begin
+    lessThan = iBjExIf.LessThan();
+  end
+  ZionRiscvIsaLib_BjEnNoLessThan  U_ZionRiscvIsaLib_BjEnNoLessThan(
+                                    .iBjExIf,
+                                    .iLessThan(lessThan),
+                                    .oBjEn(bjEn)
+                                  );
+
+endmodule: ZionRiscvIsaLib_BjEnGen
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_JumpLinkPc
+// Author      : Wenheng Ma
+// Date        : 2019-10-28
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Calculate Link PC.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-28 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_JumpLinkPc
+`ifdef ZionRiscvIsaLib_JumpLinkPc
+  `__DefErr__(ZionRiscvIsaLib_JumpLinkPc)
+`else
+  `define ZionRiscvIsaLib_JumpLinkPc(UnitName,iBjExIf_MT,oLinkPc_MT) \
+ZionRiscvIsaLib_JumpLinkPc  UnitName(                                \
+                                .iBjExIf(iBjExIf_MT),                \
+                                .oLinkPc(oLinkPc_MT)                 \
+                              );
+`endif
+module ZionRiscvIsaLib_JumpLinkPc
+(
+  ZionRiscvIsaLib_BjExItf               iBjExIf,
+  output logic [$bits(iBjExIf.s1)-1:0]  oLinkPc
+);
+
+  always_comb begin
+    oLinkPc = iBjExIf.LinkPcGen();
+  end
+
+endmodule: ZionRiscvIsaLib_JumpLinkPc
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_S1LinkOffsetMux
+// Author      : Wenheng Ma
+// Date        : 2019-10-28
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Mux the normal s1 and link offset.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-28 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_S1LinkOffsetMux
+`ifdef ZionRiscvIsaLib_S1LinkOffsetMux
+  `__DefErr__(ZionRiscvIsaLib_S1LinkOffsetMux)
+`else
+  `define ZionRiscvIsaLib_S1LinkOffsetMux(UnitName,iBjExIf_MT,ooS1Mux_MT)   \
+ZionRiscvIsaLib_S1LinkOffsetMux  UnitName(                                  \
+                                .iBjExIf(iBjExIf_MT),                       \
+                                .oS1Mux(ooS1Mux_MT)                         \
+                              );
+`endif
+module ZionRiscvIsaLib_S1LinkOffsetMux
+(
+  ZionRiscvIsaLib_BjExItf          iBjExIf,
+  output logic  [$bits(iBjExIf.s1)-1:0] oS1Mux
+);
+
+  always_comb begin
+    oS1Mux = iBjExIf.S1LinkOffsetMux();
+  end
+
+endmodule : ZionRiscvIsaLib_S1LinkOffsetMux
+`endif
+
+//endsection: BranchJumpEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+//section: SetLessThanEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits about Set Less Than instructions are provided in this section.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface name : ZionRiscvIsaLib_SltExItf
+// Author         : Wenheng Ma
+// Date           : 2019-10-27
+// Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
+// Description    :
+//   Define signals that SLT(set less than) operation ISA nead. And offer an Excution function to get the operation 
+//   result. Note that this interface can be reused by the branch instructions.
+//   'Set less than' contains 4 instructions: SLT/SLTI, SLTU/SLTIU.
+//   'Branch' contains 4 instructions: BLT/BLTU, BGE/BGEU.
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-27 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+`ifndef Disable_ZionRiscvIsaLib_SltExItf
+interface ZionRiscvIsaLib_SltExItf
+#(RV64 = 0);
+`Use_ZionBasicCircuitLib(Bc)
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic en, unsignedFlg, rslt;
+  logic [CPU_WIDTH-1:0] s1,s2;
+
+  // Extend data according to unsigned flag(unsignedFlg), then compare the size of s1 and s2.
+  // With the extension of data, we can reuse the compare circuits for both signed and unsigned compare operations.
+  function automatic logic Exec;
+
+    logic signed [CPU_WIDTH:0] s1Extd, s1Mask, s2Extd, s2Mask;
+    s1Extd = {((~unsignedFlg) & `BcHighB(s1)) , s1};
+    s2Extd = {((~unsignedFlg) & `BcHighB(s2)) , s2};
+    s1Mask = `BcMaskM(en,s1Extd);
+    s2Mask = `BcMaskM(en,s2Extd);
+    return ((s1Mask<s2Mask)? 1'b1:1'b0);
+
+  endfunction: Exec
+
+  modport De (output en, unsignedFlg, s1, s2);
+  modport Ex (input  en, unsignedFlg, s1, s2, import Exec);
+
+ `Unuse_ZionBasicCircuitLib(Bc)
+endinterface: ZionRiscvIsaLib_SltExItf
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_SetLessThan
+// Author      : Wenheng Ma
+// Date        : 2019-10-27
+// Version     : 1.0
+// Parameter   : None
+// Description :
+//   Less than execution.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-27 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_SetLessThan
+`ifdef ZionRiscvIsaLib_SetLessThan
+  `__DefErr__(ZionRiscvIsaLib_SetLessThan)
+`else
+  `define ZionRiscvIsaLib_SetLessThan(UnitName,iSltExIf_MT,oRslt_MT)      \
+  ZionRiscvIsaLib_SetLessThan UnitName(                                   \
+                                .iSltExIf(iSltExIf_MT),                   \
+                                .oRslt(oRslt_MT)                          \
+                              );
+`endif
+module ZionRiscvIsaLib_SetLessThan
+(
+  ZionRiscvIsaLib_SltExItf.Ex iSltExIf,
+  output logic oRslt
+);
+
+  always_comb begin
+    oRslt = iSltExIf.Exec();
+  end
+
+endmodule: ZionRiscvIsaLib_SetLessThan
+`endif
+
+//endsection: SetLessThanEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+//section: ShiftEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits about shift instructions are provided in this section.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface name : ZionRiscvIsaLib_SftExItf
+// Author         : Wenheng Ma
+// Date           : 2019-10-27
+// Version        : 1.0
+// Parameter      :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
+// Description    :
+//   Define signals that shift(sft) operation ISA nead.
+//   Shift operation contains 12 instructions: 
+//     SLL  / SLLI ,        SRL  / SRLI ,        SRA  / SRAI ,  
+//     SLLW / SLLIW,        SRLW / SRLIW,        SRAW / SRAIW, (instructions with .W is only used in R64I)
+//   In the code, op indicate the operation type:
+//     op[0] = shift left,            op[1] = shift right,     
+//     op[2] = arithmetic shift,      op[3] = .W (only for R64I)
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-27 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+`ifndef Disable_ZionRiscvIsaLib_SftExItf
+interface ZionRiscvIsaLib_SftExItf
+#(RV64 = 0);
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic [2+RV64:0] op;
+  logic [CPU_WIDTH-1:0] s1, rslt;
+  logic [4+RV64:0]      s2;
+
+  modport De (output op, s1, s2);
+  modport Ex (input  op, s1, s2);
+
+endinterface: ZionRiscvIsaLib_SftExItf
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_SftExItf
+// Author      : Wenheng Ma
+// Date        : 2019-10-27
+// Version     : 1.0
+// Parameter   :
+//   RV64 - indicate whether the circuit is for RV64 or not. 1:RV64.  2:RV32. It can be inferred from iSftExIf.
+// Description :
+//   Shift execution.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-27 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifndef Disable_ZionRiscvIsaLib_SftExec
+`ifdef ZionRiscvIsaLib_SftExec
+  `__DefErr__(ZionRiscvIsaLib_SftExec)
+`else
+  `define ZionRiscvIsaLib_SftExec(UnitName,iSftExIf_MT,oRslt_MT)      \
+`ifdef VIVADO_SYN                                                     \
+    localparam UnitName``_RV64 = iSftExIf_MT.RV64;                    \
+  `else                                                               \
+    localparam UnitName``_RV64 = $bits(iSftExIf_MT.s1)/32-1;          \
+  `endif                                                              \
+  ZionRiscvIsaLib_SftExec#(.RV64(UnitName``_RV64))                    \
+                            UnitName(                                 \
+                              .iSftExIf(iSftExIf_MT),                 \
+                              .oRslt(oRslt_MT)                        \
+                            );
+`endif
+module ZionRiscvIsaLib_SftExec
+#(RV64 = 0
+)(
+  ZionRiscvIsaLib_SftExItf.Ex iSftExIf,
+  output logic  [$bits(iSftExIf.s1)-1:0] oRslt
+);
+/*
+  logic sftL, sftR, sftA, sftW;
+  assign sftL = iSftExIf.op[0];
+  assign sftR = iSftExIf.op[1];
+  assign sftA = iSftExIf.op[2];
+  `gen_if(RV64)begin
+    assign sftW = iSftExIf.op[3];
+  end
+
+  type_Cpu s1W, s1Tmp, s1Reverse,sftRslt,rsltReverse,rsltReverseW;
+  localparam DAT_WIDTH = $bits(type_Cpu);
+  assign s1Reverse = {<<{iSftExIf.s1}}; 
+  `gen_if(RV64) begin
+    assign s1W = {((sftW)? {32{sftA & iSftExIf.s1[31]}} : iSftExIf.s1[63:32]) , iSftExIf.s1[31:0]};
+  end `gen_else begin
+    assign s1W = iSftExIf.s1;
+  end
+  assign s1Tmp = ({DAT_WIDTH{sftL}} & s1Reverse)
+                |({DAT_WIDTH{sftR}} & s1W      );
+
+  assign sftRslt = {{DAT_WIDTH{(sftA & s1Tmp[DAT_WIDTH-1])}},s1Tmp} >> s2;
+  assign rsltReverse  = {<<{sftRslt}};
+  `gen_if(RV64) begin
+    assign rsltReverseW = signed'(rsltReverse[31:0]);
+  end `gen_else begin
+    assign rsltReverseW = rsltReverse[31:0];
+  end
+  
+  assign oRslt = (sftL)? rsltReverseW : sftRslt;
+*/
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  wire sftL = iSftExIf.op[0];
+  wire sftR = iSftExIf.op[1];
+  wire sftA = iSftExIf.op[2];
+  wire  [4+RV64     :0] sftBits = iSftExIf.s2;
+  logic [CPU_WIDTH-1:0] sftDat,rsltTmp;
+  `gen_if(RV64)begin
+    wire sftW = iSftExIf.op[3];
+    assign sftDat = {((sftW)? iSftExIf.s1[31:0] : iSftExIf.s1[63:32]) , iSftExIf.s1[31:0]};
+    wire [CPU_WIDTH-1:0] sftWRslt = signed'((sftR?rsltTmp[63:32]:'0) | (sftL?rsltTmp[31:0]:'0));//TODO: change to mask.
+    assign iSftExIf.rslt = (sftW)? sftWRslt : rsltTmp;
+  end `gen_else begin
+    assign sftDat = iSftExIf.s1;
+    assign oRslt = rsltTmp;
+  end
+
+  MultiTypeShift U_MultiTypeShift(sftR,sftA,sftL,sftDat,sftBits,rsltTmp);
+
+  // Assertions for signal check.
+  always_comb begin
+    // There is no ShiftLeftArithmetic instruction, so sftA and sftL can not be activated simultaneously.
+    assert ($onehot0({sftA, sftL}))  
+    else $error("Signal Error: Both of sftA and sftL are activated which only one could work at a certain time.");
+  end
+  if(RV64==1) begin
+    always_comb begin
+      // For ShiftW instructions(SLLW/SRLW/SRAW), the highest bit in SftExIf.s2 is not used. 
+      // Thus this bit must be 0 for ShiftW.
+      assert ($onehot0({sftW, iSftExIf.s2[5]})) 
+      else $error("Signal Error: Both of sftA and sftL are activated which only one could work at a certain time.");
+    end
+  end
+endmodule: ZionRiscvIsaLib_SftExec
+module MultiTypeShift
+#(INPUT_DATA_WIDTH  = 32,
+  SHIFT_BIT_WIDTH   = 5 ,
+  OUTPUT_DATA_WIDTH = 32 
+)(
+  input                                iSftR  ,
+  input                                iSftA  ,
+  input                                iSftL  ,
+  input        [INPUT_DATA_WIDTH -1:0] iDat   ,
+  input        [SHIFT_BIT_WIDTH  -1:0] iSftBit,
+  output logic [OUTPUT_DATA_WIDTH-1:0] oDat
+);
+`Use_ZionBasicCircuitLib(Bc)
+
+  logic [INPUT_DATA_WIDTH-1:0] datReverse, sftDat, highBits, sftRsltTmp, rsltReverse;
+  always_comb begin
+    datReverse  = {<<{iDat}};
+    sftDat      = (iSftR?iDat:'0) | (iSftL?datReverse:'0); //TODO: change to mask.
+    highBits    = {INPUT_DATA_WIDTH{iSftA&`BcHighB(sftDat)}};
+    sftRsltTmp  = INPUT_DATA_WIDTH'({highBits,sftDat} >> iSftBit);
+    rsltReverse = {<<{sftRsltTmp}};
+    oDat        = (iSftR?sftRsltTmp:'0) | (iSftL?rsltReverse:'0); //TODO: change to mask.
+  end
+`Unuse_ZionBasicCircuitLib(Bc)
+endmodule: MultiTypeShift
+`endif
+
+//endsection: ShiftEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -807,3 +1632,209 @@ interface ZionRiscvIsaLib_StoreExItf
 
 endinterface: ZionRiscvIsaLib_StoreExItf
 `endif
+
+
+
+//section: IntEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Circuits integrate all execution module of RV32I/RV64I instructions.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface name : ZionRiscvIsaLib_IntInsExItf
+// Author         : Wenheng Ma
+// Date           : 2019-10-30
+// Version        : 1.0
+// Description    :
+//   To simplify the Execution module design, the library has a parameterized integer exicution module. This interface
+//   is used by the module to put all necessary signals together. 
+//   The interface has 3 types of modport:
+//     1. Modport for integer instructions excution with branch&jump and memory address calculate.
+//        In this kind of modport, the Int Excution module takes charge of:
+//          a) int instructions execution,  b) branch&jump instrucions execution,  c) memory address calculate
+//     2. Modport for integer instructions excution with branch&jump
+//        In this kind of modport, the Int Excution module takes charge of:
+//          a) int instructions execution,  b) branch&jump instrucions execution
+//     3. Modport for integer instructions excution without other actions
+//        In this kind of modport, the Int Excution module only takes charge of int instructions execution
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-30 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+`ifndef Disable_ZionRiscvIsaLib_IntInsExItf
+interface ZionRiscvIsaLib_IntInsExItf
+#(RV64 = 0);
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic [CPU_WIDTH-1:0] pc, s1, s2, offset;
+  logic [RV64:0] flags; // flags[0] - unsigned flag       flags[1] - .W flag
+  logic addSubIns, addEn, subEn;
+  logic andEn, orEn, xorEn;
+  logic sltEn, bjEn, branch, beq, bne, blt, bge, jump;
+  logic sftLeft, sftRight, sftA;
+  logic memEn;
+  logic BjEn;
+  logic [1:0] linkOffset;
+  logic [CPU_WIDTH-1:0] intRslt, BjTgt, memAddr;
+
+  // modport for integer instructions excution with branch&jump and memory address calculate.
+  modport IntBjMemDeOut (output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
+                                sftLeft, sftRight, sftA, sltEn,
+                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset, 
+                                memEn
+                        );
+  modport IntBjMemExIn  (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
+                                sftLeft, sftRight, sftA, sltEn,
+                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset,
+                                memEn
+                        );
+  modport IntBjMemExOut(output  intRslt, BjEn, BjTgt, memAddr);
+
+  // modport for integer instructions excution with branch&jump.
+  modport IntBjDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
+                            sftLeft, sftRight, sftA, sltEn,
+                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset
+                    );
+  modport IntBjExIn (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
+                            sftLeft, sftRight, sftA, sltEn,
+                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump ,linkOffset
+                    );
+  modport IntBjExOut(output  intRslt, BjEn, BjTgt);
+
+  // modport for integer instructions excution.
+  modport IntDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
+                          sftLeft, sftRight, sftA, sltEn
+                  );
+  modport IntExIn (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
+                          sftLeft, sftRight, sftA, sltEn
+                  );
+  modport IntExOut(output  intRslt);
+
+endinterface: ZionRiscvIsaLib_IntInsExItf
+`endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Module name : ZionRiscvIsaLib_IntEx
+// Author      : Wenheng Ma
+// Date        : 2019-08-14
+// Version     : 1.0
+// Description :
+//   Integer instructions execution module. The module has 3 types(indicated by INT_MODULE_TYPE):
+//     1. Int execution with branch&jump and memory address calculate. (INT_MODULE_TYPE == 0)
+//        In this type, the module reuse the adder for memory address calculation and Link PC. Besides it reuse the 
+//        sub for 'less than'(also for branch).
+//     2. Int execution with branch&jump. (INT_MODULE_TYPE == 1)
+//        In this type, the module reuse the adder for Link PC, and reuse the sub for 'less than'(also for branch).
+//     3. Int execution. (INT_MODULE_TYPE == 2)
+//        In this type, the module do not reuse anything. It has the best performance and the largest area.
+//   When instantiated the module, the interface connection must be indicated according to the INT_MODULE_TYPE. Because
+//   different module types has different signals and circuits.
+//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
+// Modification History:
+//    Date    |   Author   |   Version   |   Change Description
+//======================================================================================================================
+// 2019-10-30 | Wenheng Ma |     1.0     |   Original Version
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+module ZionRiscvIsaLib_IntEx
+#(RV64 = 0,
+  INT_MODULE_TYPE = 0
+)(
+  ZionRiscvIsaLib_IntInsExItf iDat,
+  ZionRiscvIsaLib_IntInsExItf oDat
+);
+`Use_ZionBasicCircuitLib(Bc)
+
+  localparam CPU_WIDTH = 32*(RV64+1);
+  logic sltRslt;
+  wire unsignedFlg = iDat.flags[0];
+  logic                 SltRslt;
+  logic [CPU_WIDTH-1:0] BitsRslt;
+  logic [CPU_WIDTH-1:0] SftRslt;
+  logic [CPU_WIDTH-1:0] addSubRslt;
+  logic [CPU_WIDTH-1:0] S1LinkOffsetMuxRlst;
+  logic [CPU_WIDTH-1:0] BjTgtAddrRlst;
+  ZionRiscvIsaLib_BitsExItf#(RV64) BitsIf();
+  ZionRiscvIsaLib_SftExItf#(RV64) SftIf();
+  ZionRiscvIsaLib_AddSubExItf#(RV64) AddSubIf();
+
+  always_comb begin
+    BitsIf.andEn   = iDat.andEn   ;
+    BitsIf.orEn    = iDat.orEn    ;
+    BitsIf.xorEn   = iDat.xorEn   ;
+    BitsIf.s1      = iDat.s1      ;
+    BitsIf.s2      = iDat.s2      ;
+
+    SftIf.op[0]   = iDat.sftLeft  ;
+    SftIf.op[1]   = iDat.sftRight ;
+    SftIf.op[2]   = iDat.sftA     ;
+    SftIf.s1      = iDat.s1       ;
+    SftIf.s2[4:0] = iDat.s2[4:0]  ;
+
+    AddSubIf.op[0] = iDat.addEn   ;
+    AddSubIf.op[1] = iDat.subEn   ;
+    AddSubIf.s2    = iDat.s2      ;
+  end
+
+  `gen_if(RV64) begin
+    always_comb begin
+      SftIf.op[3] =  iDat.flags[1];
+      AddSubIf.op[2] = iDat.flags[1];
+    end
+  end
+
+  `ZionRiscvIsaLib_BitsOpExec (U_BitsOpExec, BitsIf.Ex , BitsRslt);
+  `ZionRiscvIsaLib_SftExec    (U_SftExec   , SftIf , SftRslt);
+  `ZionRiscvIsaLib_AddSubExec (U_AddSubExec, AddSubIf , addSubRslt);
+
+  `gen_if(INT_MODULE_TYPE==0 | INT_MODULE_TYPE==1) begin: IntModuleType_0_1
+    wire lessThanFlg = `BcHighB(addSubRslt);
+    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, S1LinkOffsetMuxRlst);
+    ZionRiscvIsaLib_BjExItf#(RV64) BjIf();
+    always_comb begin
+      AddSubIf.s1    = S1LinkOffsetMuxRlst;
+
+      BjIf.bjEn        = iDat.bjEn;
+      BjIf.branch      = iDat.branch;
+      BjIf.beq         = iDat.beq;
+      BjIf.bne         = iDat.bne;
+      BjIf.blt         = iDat.blt;
+      BjIf.bge         = iDat.bge;
+      BjIf.unsignedFlg = unsignedFlg;
+      BjIf.jump        = iDat.jump;
+      BjIf.linkOffset  = iDat.linkOffset;
+      BjIf.pc          = iDat.pc;
+      BjIf.s1          = iDat.s1;
+      BjIf.s2          = iDat.s2;
+      BjIf.offset      = iDat.offset;
+
+      oDat.intRslt = BitsRslt  | `BcMaskM((iDat.addSubIns|iDat.jump),addSubRslt) 
+                    |SftRslt   | `BcZeroExtdM((sltRslt & iDat.sltEn),CPU_WIDTH);
+      oDat.BjTgt   = BjTgtAddrRlst;
+    end
+    `ZionRiscvIsaLib_AddSubLessThan (U_AddSubLessThan, AddSubIf, unsignedFlg, lessThanFlg, sltRslt);
+    `ZionRiscvIsaLib_BjEnNoLessThan (U_BjEnNoLt , BjIf.Ex, lessThanFlg, oDat.BjEn );
+    `ZionRiscvIsaLib_BjTgtAddr(U_BjTgtAddr, BjIf.Ex,              BjTgtAddrRlst);
+    `gen_if(INT_MODULE_TYPE==0)  
+        assign oDat.memAddr = (iDat.memEn)? addSubRslt : '0;
+  end
+  `gen_elif(INT_MODULE_TYPE==2) begin: IntModuleType_2
+    ZionRiscvIsaLib_SltExItf#(RV64) SltIf();
+    always_comb begin
+      AddSubIf.s1    = iDat.s1;
+      SltIf.en          = iDat.sltEn;
+      SltIf.unsignedFlg = unsignedFlg;
+      SltIf.s1 = iDat.s1;
+      SltIf.s2 = iDat.s2;
+      oDat.intRslt = BitsRslt | SftRslt | addSubRslt | {{(CPU_WIDTH-1){1'b0}},{SltRslt}};
+    end
+    `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf,SltRslt);
+  end
+`Unuse_ZionBasicCircuitLib(Bc)
+endmodule: ZionRiscvIsaLib_IntEx
+
+//endsection: IntEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
