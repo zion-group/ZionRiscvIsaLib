@@ -712,25 +712,25 @@ endinterface : ZionRiscvIsaLib_AddSubExItf
   `__DefErr__(ZionRiscvIsaLib_AddSubExec)
 `else
   `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT,oRslt_MT)   \
-`ifdef VIVADO_SYN                                                        \
-    localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                    \
-  `else                                                                  \
-    localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;          \
-  `endif                                                                 \
-  ZionRiscvIsaLib_AddSubExec#(.RV64(UnitName``_RV64))                    \
+// `ifdef VIVADO_SYN                                                        \
+//     localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                    \
+//   `else                                                                  \
+//     localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;          \
+//   `endif                                                                 \
+  ZionRiscvIsaLib_AddSubExec#(.CPU_WIDTH($bits(oRslt_MT)))               \
                             UnitName(                                    \
                               .iAddSubExIf(iAddSubExIf_MT),              \
                               .oRslt(oRslt_MT)                           \
-                            );
+                            )
 `endif
 module ZionRiscvIsaLib_AddSubExec
-#(RV64 = 0
+#(CPU_WIDTH = 32
 )(
   ZionRiscvIsaLib_AddSubExItf.Ex iAddSubExIf,
-  output logic [$bits(iAddSubExIf.s1)-1:0] oRslt
+  output logic [CPU_WIDTH-1:0] oRslt
 );
  `Use_ZionBasicCircuitLib(Bc)
-  localparam CPU_WIDTH = 32*(RV64+1);
+  localparam RV64 = (CPU_WIDTH/32)-1;
   logic [CPU_WIDTH-1:0] s1, s1Tmp, s2, s2Tmp, rsltTmp;
   wire addEn = iAddSubExIf.op[0];
   wire subEn = iAddSubExIf.op[1];
@@ -784,7 +784,7 @@ ZionRiscvIsaLib_AddSubLessThan  UnitName(                                       
                                     .iUnsignedFlg(iUnsignedFlg_MT),                                            \
                                     .iCmpRsltSign(iCmpRsltSign_MT),                                            \
                                     .oLessThan(oLessThan_MT)                                                   \
-                                  );
+                                  )
 `endif
 module ZionRiscvIsaLib_AddSubLessThan
 (
@@ -875,14 +875,17 @@ endinterface: ZionRiscvIsaLib_BitsExItf
   `__DefErr__(ZionRiscvIsaLib_BitsOpExec)
 `else
   `define ZionRiscvIsaLib_BitsOpExec(UnitName,iBitsExif_MT,oRslt_MT) \
-ZionRiscvIsaLib_BitsOpExec UnitName(.iBitsExif(iBitsExif_MT),        \
-                                    .oRslt(oRslt_MT)                 \
-                                    );
+ZionRiscvIsaLib_BitsOpExec  #(.CPU_WIDTH($bits(oRslt_MT)))           \
+                            UnitName(                                \
+                              .iBitsExif(iBitsExif_MT),              \
+                              .oRslt(oRslt_MT)                       \
+                            )
 `endif
 module ZionRiscvIsaLib_BitsOpExec
-(
+#(CPU_WIDTH = 32
+)(
   ZionRiscvIsaLib_BitsExItf.Ex iBitsExif,
-  output logic [$bits(iBitsExif.s1)-1:0] oRslt
+  output logic [CPU_WIDTH-1:0] oRslt
 );
 
   always_comb begin
@@ -935,7 +938,7 @@ interface ZionRiscvIsaLib_BjExItf
 #(RV64 = 0);
  `Use_ZionBasicCircuitLib(Bc)
   localparam CPU_WIDTH = 32*(RV64+1);
-  logic bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump;
+  logic bjIns, branch, beq, bne, blt, bge, unsignedFlg, jump;
   logic [1:0] linkOffset;
   logic [CPU_WIDTH-1:0] pc, s1, s2, offset, tgtAddr, linkPc, s1Fnl;
 
@@ -946,7 +949,7 @@ interface ZionRiscvIsaLib_BjExItf
     logic [CPU_WIDTH-1:0] baseAddr, tgtOffset;
     baseAddr  =  `BcMaskM(branch,pc)     
                 |`BcMaskM(jump,s1);      
-    tgtOffset =  `BcMaskM(bjEn,offset);  
+    tgtOffset =  `BcMaskM(bjIns,offset);  
     return (baseAddr + tgtOffset);
 
   endfunction : TgtAddrGen
@@ -985,8 +988,8 @@ interface ZionRiscvIsaLib_BjExItf
     return muxRslt;
   endfunction : S1LinkOffsetMux
 
-  modport De( output bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset);
-  modport Ex( input  bjEn, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset,
+  modport De( output bjIns, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset);
+  modport Ex( input  bjIns, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset,
               import LessThan
             );
   `Unuse_ZionBasicCircuitLib(Bc)
@@ -1012,15 +1015,17 @@ endinterface : ZionRiscvIsaLib_BjExItf
   `__DefErr__(ZionRiscvIsaLib_BjTgtAddr)
 `else
   `define ZionRiscvIsaLib_BjTgtAddr(UnitName,iBjExIf_MT,oTgtAddr_MT)   \
-ZionRiscvIsaLib_BjTgtAddr UnitName(                                    \
-                              .iBjExIf(iBjExIf_MT),                    \
-                              .oTgtAddr(oTgtAddr_MT)                   \
-                            );
+ZionRiscvIsaLib_BjTgtAddr  #(.CPU_WIDTH($bits(oTgtAddr_MT)))           \
+                          UnitName (                                   \
+                             .iBjExIf(iBjExIf_MT),                     \
+                             .oTgtAddr(oTgtAddr_MT)                    \
+                             )
 `endif
 module ZionRiscvIsaLib_BjTgtAddr
-(
+#(CPU_WIDTH =32
+ )(
   ZionRiscvIsaLib_BjExItf iBjExIf,
-  output logic [$bits(iBjExIf.s1)-1:0] oTgtAddr
+  output logic [CPU_WIDTH-1:0] oTgtAddr
 );
 
   always_comb begin
@@ -1054,7 +1059,7 @@ endmodule: ZionRiscvIsaLib_BjTgtAddr
                               .iBjExIf(iBjExIf_MT),                                 \
                               .iLessThan(iLessThan_MT),                             \
                               .oBjEn(oBjEn_MT)                                      \
-                            );
+                            )
 `endif
 module ZionRiscvIsaLib_BjEnNoLessThan
 (
@@ -1101,7 +1106,7 @@ endmodule: ZionRiscvIsaLib_BjEnNoLessThan
   ZionRiscvIsaLib_BjEnGen UnitName(                             \
                                 .iBjExIf(iBjExIf_MT),           \
                                 .oBjEn(oBjEn_MT)                \
-                              );
+                              )
 `endif
 module ZionRiscvIsaLib_BjEnGen
 (
@@ -1141,15 +1146,17 @@ endmodule: ZionRiscvIsaLib_BjEnGen
   `__DefErr__(ZionRiscvIsaLib_JumpLinkPc)
 `else
   `define ZionRiscvIsaLib_JumpLinkPc(UnitName,iBjExIf_MT,oLinkPc_MT) \
-ZionRiscvIsaLib_JumpLinkPc  UnitName(                                \
+ZionRiscvIsaLib_JumpLinkPc  #(.CPU_WIDTH($bits(oLinkPc_MT)))         \
+                            UnitName(                                \
                                 .iBjExIf(iBjExIf_MT),                \
                                 .oLinkPc(oLinkPc_MT)                 \
-                              );
+                              )
 `endif
 module ZionRiscvIsaLib_JumpLinkPc
-(
+#(CPU_WIDTH = 32
+)(
   ZionRiscvIsaLib_BjExItf               iBjExIf,
-  output logic [$bits(iBjExIf.s1)-1:0]  oLinkPc
+  output logic [CPU_WIDTH-1:0]          oLinkPc
 );
 
   always_comb begin
@@ -1178,15 +1185,17 @@ endmodule: ZionRiscvIsaLib_JumpLinkPc
   `__DefErr__(ZionRiscvIsaLib_S1LinkOffsetMux)
 `else
   `define ZionRiscvIsaLib_S1LinkOffsetMux(UnitName,iBjExIf_MT,ooS1Mux_MT)   \
-ZionRiscvIsaLib_S1LinkOffsetMux  UnitName(                                  \
+ZionRiscvIsaLib_S1LinkOffsetMux #(.CPU_WIDTH($bits(ooS1Mux_MT)))            \
+                                UnitName(                                   \
                                 .iBjExIf(iBjExIf_MT),                       \
                                 .oS1Mux(ooS1Mux_MT)                         \
-                              );
+                                )
 `endif
 module ZionRiscvIsaLib_S1LinkOffsetMux
-(
+#(CPU_WIDTH = 32
+)(
   ZionRiscvIsaLib_BjExItf          iBjExIf,
-  output logic  [$bits(iBjExIf.s1)-1:0] oS1Mux
+  output logic  [CPU_WIDTH-1:0]    oS1Mux
 );
 
   always_comb begin
@@ -1274,7 +1283,7 @@ endinterface: ZionRiscvIsaLib_SltExItf
   ZionRiscvIsaLib_SetLessThan UnitName(                                   \
                                 .iSltExIf(iSltExIf_MT),                   \
                                 .oRslt(oRslt_MT)                          \
-                              );
+                              )
 `endif
 module ZionRiscvIsaLib_SetLessThan
 (
@@ -1354,23 +1363,24 @@ endinterface: ZionRiscvIsaLib_SftExItf
   `__DefErr__(ZionRiscvIsaLib_SftExec)
 `else
   `define ZionRiscvIsaLib_SftExec(UnitName,iSftExIf_MT,oRslt_MT)      \
-`ifdef VIVADO_SYN                                                     \
-    localparam UnitName``_RV64 = iSftExIf_MT.RV64;                    \
-  `else                                                               \
-    localparam UnitName``_RV64 = $bits(iSftExIf_MT.s1)/32-1;          \
-  `endif                                                              \
-  ZionRiscvIsaLib_SftExec#(.RV64(UnitName``_RV64))                    \
+// `ifdef VIVADO_SYN                                                     \
+//     localparam UnitName``_RV64 = iSftExIf_MT.RV64;                    \
+//   `else                                                               \
+//     localparam UnitName``_RV64 = $bits(iSftExIf_MT.s1)/32-1;          \
+//   `endif                                                              \
+  ZionRiscvIsaLib_SftExec   #(.CPU_WIDTH($bits(oRslt_MT)))            \
                             UnitName(                                 \
                               .iSftExIf(iSftExIf_MT),                 \
                               .oRslt(oRslt_MT)                        \
-                            );
+                            )
 `endif
 module ZionRiscvIsaLib_SftExec
-#(RV64 = 0
+#(CPU_WIDTH = 32
 )(
   ZionRiscvIsaLib_SftExItf.Ex iSftExIf,
-  output logic  [$bits(iSftExIf.s1)-1:0] oRslt
+  output logic  [CPU_WIDTH-1:0] oRslt
 );
+`Use_ZionBasicCircuitLib(Bc)
 /*
   logic sftL, sftR, sftA, sftW;
   assign sftL = iSftExIf.op[0];
@@ -1402,7 +1412,7 @@ module ZionRiscvIsaLib_SftExec
   assign oRslt = (sftL)? rsltReverseW : sftRslt;
 */
 
-  localparam CPU_WIDTH = 32*(RV64+1);
+  localparam RV64 = (CPU_WIDTH/32)-1;
   wire sftL = iSftExIf.op[0];
   wire sftR = iSftExIf.op[1];
   wire sftA = iSftExIf.op[2];
@@ -1418,8 +1428,7 @@ module ZionRiscvIsaLib_SftExec
     assign oRslt = rsltTmp;
   end
 
-  MultiTypeShift U_MultiTypeShift(sftR,sftA,sftL,sftDat,sftBits,rsltTmp);
-
+  `BcMultiTypeShift (U_MultiTypeShift,sftR,sftA,sftL,1'b0,sftDat,sftBits,rsltTmp);
   // Assertions for signal check.
   always_comb begin
     // There is no ShiftLeftArithmetic instruction, so sftA and sftL can not be activated simultaneously.
@@ -1434,34 +1443,9 @@ module ZionRiscvIsaLib_SftExec
       else $error("Signal Error: Both of sftA and sftL are activated which only one could work at a certain time.");
     end
   end
+  `Unuse_ZionBasicCircuitLib(Bc)
 endmodule: ZionRiscvIsaLib_SftExec
-module MultiTypeShift
-#(INPUT_DATA_WIDTH  = 32,
-  SHIFT_BIT_WIDTH   = 5 ,
-  OUTPUT_DATA_WIDTH = 32 
-)(
-  input                                iSftR  ,
-  input                                iSftA  ,
-  input                                iSftL  ,
-  input        [INPUT_DATA_WIDTH -1:0] iDat   ,
-  input        [SHIFT_BIT_WIDTH  -1:0] iSftBit,
-  output logic [OUTPUT_DATA_WIDTH-1:0] oDat
-);
-`Use_ZionBasicCircuitLib(Bc)
-
-  logic [INPUT_DATA_WIDTH-1:0] datReverse, sftDat, highBits, sftRsltTmp, rsltReverse;
-  always_comb begin
-    datReverse  = {<<{iDat}};
-    sftDat      = (iSftR?iDat:'0) | (iSftL?datReverse:'0); //TODO: change to mask.
-    highBits    = {INPUT_DATA_WIDTH{iSftA&`BcHighB(sftDat)}};
-    sftRsltTmp  = INPUT_DATA_WIDTH'({highBits,sftDat} >> iSftBit);
-    rsltReverse = {<<{sftRsltTmp}};
-    oDat        = (iSftR?sftRsltTmp:'0) | (iSftL?rsltReverse:'0); //TODO: change to mask.
-  end
-`Unuse_ZionBasicCircuitLib(Bc)
-endmodule: MultiTypeShift
 `endif
-
 //endsection: ShiftEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
@@ -1484,69 +1468,69 @@ endmodule: MultiTypeShift
 //======================================================================================================================
 // 19-08-02 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-`ifndef Disable_ZionRiscvIsaLib_LoadExItf
-interface ZionRiscvIsaLib_LoadExItf
-#(RV64 = 0);
+// `ifndef Disable_ZionRiscvIsaLib_LoadExItf
+// interface ZionRiscvIsaLib_LoadExItf
+// #(RV64 = 0);
 
-  localparam CPU_WIDTH = 32*(RV64+1);
-  logic [(2+RV64):0] loadEn;
-  logic              unsignedLoad;
-  logic [(1+RV64):0] addr;
-  logic [CPU_WIDTH-1:0] memDat;
+//   localparam CPU_WIDTH = 32*(RV64+1);
+//   logic [(2+RV64):0] loadEn;
+//   logic              unsignedLoad;
+//   logic [(1+RV64):0] addr;
+//   logic [CPU_WIDTH-1:0] memDat;
 
-  function automatic logic [CPU_WIDTH-1:0] Exec;
+//   function automatic logic [CPU_WIDTH-1:0] Exec;
     
-    logic [CPU_WIDTH-1:0] result;
-    // LB 
-    logic [CPU_WIDTH/8-1:0][7:0] byteSplitDat;
-    logic                  [7:0] byteLoadDat;
-    logic                        byteMsb,byteExtend;
-    logic [CPU_WIDTH-1  :0]      byteLoadRslt;
-    // LH
-    logic [CPU_WIDTH/16-1:0][15:0] halfwordSplitDat;
-    logic                   [15:0] halfwordLoadDat;
-    logic                          halfwordMsb,halfwordExtend;
-    logic [CPU_WIDTH-1   :0]       halfwordLoadRslt;
-    // LW
-    logic [CPU_WIDTH/32-1:0][31:0] wordSplitDat;
-    logic                   [31:0] wordLoadDat;
-    logic                          wordMsb,wordExtend;
-    logic [CPU_WIDTH-1   :0]       wordLoadRslt;
-    // LD
-    logic [CPU_WIDTH-1   :0] doubleLoadRslt;
-    // LB
-    byteSplitDat = memDat;
-    byteLoadDat  = byteSplitDat[addr];//[addr[$high(addr):0]]
-    byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
-    byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
-    // LH
-    halfwordSplitDat = memDat;
-    halfwordLoadDat  = halfwordSplitDat[addr[$high(addr)]];//addr[$high(addr):1]
-    halfwordExtend   = (~unsignedLoad) & halfwordLoadDat[$high(halfwordLoadDat)];
-    halfwordLoadRslt = {CPU_WIDTH{loadEn[1]}} & {{(CPU_WIDTH-$bits(halfwordLoadDat)){halfwordExtend}}, halfwordLoadDat};
-    `gen_if(RV64==0)begin
-      // LW for RV32
-      wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & memDat;
-      result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt;
-    end `gen_else begin//`gen_elif(RV64==1)
-      // LW for RV64
-      wordSplitDat = memDat;
-      wordLoadDat  = wordSplitDat[addr[$high(addr)]];//[addr[$high(addr):2]]
-      wordExtend   = (~unsignedLoad) & wordLoadDat[$high(wordLoadDat)];
-      wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & {{(CPU_WIDTH-$bits(wordLoadDat)){wordExtend}}, wordLoadDat};
-      //LD for RV64
-      doubleLoadRslt = {CPU_WIDTH{loadEn[3]}} & memDat;
-      result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt | doubleLoadRslt;
-    end
-    return result;
+//     logic [CPU_WIDTH-1:0] result;
+//     // LB 
+//     logic [CPU_WIDTH/8-1:0][7:0] byteSplitDat;
+//     logic                  [7:0] byteLoadDat;
+//     logic                        byteMsb,byteExtend;
+//     logic [CPU_WIDTH-1  :0]      byteLoadRslt;
+//     // LH
+//     logic [CPU_WIDTH/16-1:0][15:0] halfwordSplitDat;
+//     logic                   [15:0] halfwordLoadDat;
+//     logic                          halfwordMsb,halfwordExtend;
+//     logic [CPU_WIDTH-1   :0]       halfwordLoadRslt;
+//     // LW
+//     logic [CPU_WIDTH/32-1:0][31:0] wordSplitDat;
+//     logic                   [31:0] wordLoadDat;
+//     logic                          wordMsb,wordExtend;
+//     logic [CPU_WIDTH-1   :0]       wordLoadRslt;
+//     // LD
+//     logic [CPU_WIDTH-1   :0] doubleLoadRslt;
+//     // LB
+//     byteSplitDat = memDat;
+//     byteLoadDat  = byteSplitDat[addr];//[addr[$high(addr):0]]
+//     byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
+//     byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
+//     // LH
+//     halfwordSplitDat = memDat;
+//     halfwordLoadDat  = halfwordSplitDat[addr[$high(addr)]];//addr[$high(addr):1]
+//     halfwordExtend   = (~unsignedLoad) & halfwordLoadDat[$high(halfwordLoadDat)];
+//     halfwordLoadRslt = {CPU_WIDTH{loadEn[1]}} & {{(CPU_WIDTH-$bits(halfwordLoadDat)){halfwordExtend}}, halfwordLoadDat};
+//     `gen_if(RV64==0)begin
+//       // LW for RV32
+//       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & memDat;
+//       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt;
+//     end `gen_else begin//`gen_elif(RV64==1)
+//       // LW for RV64
+//       wordSplitDat = memDat;
+//       wordLoadDat  = wordSplitDat[addr[$high(addr)]];//[addr[$high(addr):2]]
+//       wordExtend   = (~unsignedLoad) & wordLoadDat[$high(wordLoadDat)];
+//       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & {{(CPU_WIDTH-$bits(wordLoadDat)){wordExtend}}, wordLoadDat};
+//       //LD for RV64
+//       doubleLoadRslt = {CPU_WIDTH{loadEn[3]}} & memDat;
+//       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt | doubleLoadRslt;
+//     end
+//     return result;
 
-  endfunction: Exec
+//   endfunction: Exec
 
-  modport De (output loadEn, unsignedLoad, addr, memDat);
-  modport Ex (input  loadEn, unsignedLoad, addr, memDat, import Exec);
+//   modport De (output loadEn, unsignedLoad, addr, memDat);
+//   modport Ex (input  loadEn, unsignedLoad, addr, memDat, import Exec);
 
-endinterface: ZionRiscvIsaLib_LoadExItf
-`endif
+// endinterface: ZionRiscvIsaLib_LoadExItf
+// `endif
 
 
 
@@ -1566,72 +1550,72 @@ endinterface: ZionRiscvIsaLib_LoadExItf
 //======================================================================================================================
 // 19-08-02 | Wenheng Ma |     1.0     |   Original Version
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-`ifndef Disable_ZionRiscvIsaLib_StoreExItf
-interface ZionRiscvIsaLib_StoreExItf
-#(RV64 = 0);
+// `ifndef Disable_ZionRiscvIsaLib_StoreExItf
+// interface ZionRiscvIsaLib_StoreExItf
+// #(RV64 = 0);
 
-  localparam CPU_WIDTH = 32*(RV64+1);
-  localparam int STORE_WIDTH = {8,16,32};
-  logic [(2+RV64):0] storeEn;
-  logic [(1+RV64):0] addr;
-  logic [CPU_WIDTH-1:0] storeDat;
+//   localparam CPU_WIDTH = 32*(RV64+1);
+//   localparam int STORE_WIDTH = {8,16,32};
+//   logic [(2+RV64):0] storeEn;
+//   logic [(1+RV64):0] addr;
+//   logic [CPU_WIDTH-1:0] storeDat;
 
-  function automatic logic [CPU_WIDTH-1:0] Exec;
+//   function automatic logic [CPU_WIDTH-1:0] Exec;
     
-    typedef logic [CPU_WIDTH  -1:0] type_WrDat;
-    typedef logic [CPU_WIDTH/8-1:0] type_WrEn;
-    logic [CPU_WIDTH  -1:0] wrDat;
-    logic [CPU_WIDTH/8-1:0] wrEn;
-    //SB
-    logic [CPU_WIDTH/8-1:0][7:0] byteWrDat;
-    logic [CPU_WIDTH/8-1:0]      byteWrEn;
-    //SH
-    logic [CPU_WIDTH/16-1:0][15:0] halfwordWrDat;
-    logic [CPU_WIDTH/16-1:0][ 1:0] halfwordWrEn;
-    //SW
-    logic [CPU_WIDTH/32-1:0][31:0] wordWrDat;
-    logic [CPU_WIDTH/32-1:0][ 3:0] wordWrEn;
-    //SD
-    logic [CPU_WIDTH/-1:0] doubleWrDat;
-    logic [           7:0] doubleWrEn;
-    //SB
-    byteWrDat = '0;
-    byteWrEn  = '0;
-    byteWrDat[addr[$high(addr):0]] = {8{storeEn[0]}} & storeDat[0+:8];
-    byteWrEn[addr[$high(addr):0]]  = storeEn[0];
-    //SH
-    halfwordWrDat = '0;
-    halfwordWrEn  = '0;
-    halfwordWrDat[addr[$high(addr):1]] = {16{storeEn[1]}} & storeDat[0+:16];
-    halfwordWrEn[addr[$high(addr):1]]  = {2{storeEn[1]}};
-    `gen_if(RV64==0) begin
-      //SW for RV32
-      wordWrDat = {31storeEn[2]} & storeDat;
-      wordWrEn  = {4{storeEn[2]}};
-      wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | wordWrDat;
-      wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | wordWrEn;
-    end `gen_elif(RV64==1) begin
-      //SW for RV64
-      wordWrDat = '0;
-      wordWrEn  = '0;
-      wordWrDat[addr[$high(addr):2]] = {32{storeEn[2]}} & storeDat[0+:32];
-      wordWrEn[addr[$high(addr):2]]  = {4{storeEn[2]}};
-      //SD for RV64
-      doubleWrDat = {31storeEn[3]} & storeDat;
-      doubleWrEn  = {8{storeEn[3]}};
-      wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | type_WrDat'(wordWrDat) | doubleWrDat;
-      wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | type_WrEn'(wordWrEn)   | doubleWrEn;
-    end
+//     typedef logic [CPU_WIDTH  -1:0] type_WrDat;
+//     typedef logic [CPU_WIDTH/8-1:0] type_WrEn;
+//     logic [CPU_WIDTH  -1:0] wrDat;
+//     logic [CPU_WIDTH/8-1:0] wrEn;
+//     //SB
+//     logic [CPU_WIDTH/8-1:0][7:0] byteWrDat;
+//     logic [CPU_WIDTH/8-1:0]      byteWrEn;
+//     //SH
+//     logic [CPU_WIDTH/16-1:0][15:0] halfwordWrDat;
+//     logic [CPU_WIDTH/16-1:0][ 1:0] halfwordWrEn;
+//     //SW
+//     logic [CPU_WIDTH/32-1:0][31:0] wordWrDat;
+//     logic [CPU_WIDTH/32-1:0][ 3:0] wordWrEn;
+//     //SD
+//     logic [CPU_WIDTH/-1:0] doubleWrDat;
+//     logic [           7:0] doubleWrEn;
+//     //SB
+//     byteWrDat = '0;
+//     byteWrEn  = '0;
+//     byteWrDat[addr[$high(addr):0]] = {8{storeEn[0]}} & storeDat[0+:8];
+//     byteWrEn[addr[$high(addr):0]]  = storeEn[0];
+//     //SH
+//     halfwordWrDat = '0;
+//     halfwordWrEn  = '0;
+//     halfwordWrDat[addr[$high(addr):1]] = {16{storeEn[1]}} & storeDat[0+:16];
+//     halfwordWrEn[addr[$high(addr):1]]  = {2{storeEn[1]}};
+//     `gen_if(RV64==0) begin
+//       //SW for RV32
+//       wordWrDat = {31storeEn[2]} & storeDat;
+//       wordWrEn  = {4{storeEn[2]}};
+//       wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | wordWrDat;
+//       wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | wordWrEn;
+//     end `gen_elif(RV64==1) begin
+//       //SW for RV64
+//       wordWrDat = '0;
+//       wordWrEn  = '0;
+//       wordWrDat[addr[$high(addr):2]] = {32{storeEn[2]}} & storeDat[0+:32];
+//       wordWrEn[addr[$high(addr):2]]  = {4{storeEn[2]}};
+//       //SD for RV64
+//       doubleWrDat = {31storeEn[3]} & storeDat;
+//       doubleWrEn  = {8{storeEn[3]}};
+//       wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | type_WrDat'(wordWrDat) | doubleWrDat;
+//       wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | type_WrEn'(wordWrEn)   | doubleWrEn;
+//     end
 
-    return {rsltMask, rsltDat};
+//     return {rsltMask, rsltDat};
 
-  endfunction: Exec
+//   endfunction: Exec
 
-  modport De (output storeEn, addr, memDat);
-  modport Ex (input  storeEn, addr, memDat, import Exec);
+//   modport De (output storeEn, addr, memDat);
+//   modport Ex (input  storeEn, addr, memDat, import Exec);
 
-endinterface: ZionRiscvIsaLib_StoreExItf
-`endif
+// endinterface: ZionRiscvIsaLib_StoreExItf
+// `endif
 
 
 
@@ -1672,36 +1656,36 @@ interface ZionRiscvIsaLib_IntInsExItf
   logic [RV64:0] flags; // flags[0] - unsigned flag       flags[1] - .W flag
   logic addSubIns, addEn, subEn;
   logic andEn, orEn, xorEn;
-  logic sltEn, bjEn, branch, beq, bne, blt, bge, jump;
+  logic sltEn, bjIns, branch, beq, bne, blt, bge, jump;
   logic sftLeft, sftRight, sftA;
   logic memEn;
-  logic BjEn;
+  logic bjEn;
   logic [1:0] linkOffset;
   logic [CPU_WIDTH-1:0] intRslt, BjTgt, memAddr;
 
   // modport for integer instructions excution with branch&jump and memory address calculate.
   modport IntBjMemDeOut (output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                                 sftLeft, sftRight, sftA, sltEn,
-                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset, 
+                                addSubIns, bjIns, branch, beq, bne, blt, bge, jump, linkOffset, 
                                 memEn
                         );
   modport IntBjMemExIn  (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                                 sftLeft, sftRight, sftA, sltEn,
-                                addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset,
+                                addSubIns, bjIns, branch, beq, bne, blt, bge, jump, linkOffset,
                                 memEn
                         );
-  modport IntBjMemExOut(output  intRslt, BjEn, BjTgt, memAddr);
+  modport IntBjMemExOut(output  intRslt, bjEn, BjTgt, memAddr);
 
   // modport for integer instructions excution with branch&jump.
   modport IntBjDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                             sftLeft, sftRight, sftA, sltEn,
-                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump, linkOffset
+                            addSubIns, bjIns, branch, beq, bne, blt, bge, jump, linkOffset
                     );
   modport IntBjExIn (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                             sftLeft, sftRight, sftA, sltEn,
-                            addSubIns, bjEn, branch, beq, bne, blt, bge, jump ,linkOffset
+                            addSubIns, bjIns, branch, beq, bne, blt, bge, jump ,linkOffset
                     );
-  modport IntBjExOut(output  intRslt, BjEn, BjTgt);
+  modport IntBjExOut(output  intRslt, bjEn, BjTgt);
 
   // modport for integer instructions excution.
   modport IntDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
@@ -1745,6 +1729,7 @@ module ZionRiscvIsaLib_IntEx
   ZionRiscvIsaLib_IntInsExItf iDat,
   ZionRiscvIsaLib_IntInsExItf oDat
 );
+
 `Use_ZionBasicCircuitLib(Bc)
 
   localparam CPU_WIDTH = 32*(RV64+1);
@@ -1796,7 +1781,7 @@ module ZionRiscvIsaLib_IntEx
     always_comb begin
       AddSubIf.s1    = S1LinkOffsetMuxRlst;
 
-      BjIf.bjEn        = iDat.bjEn;
+      BjIf.bjEn        = iDat.bjIns;
       BjIf.branch      = iDat.branch;
       BjIf.beq         = iDat.beq;
       BjIf.bne         = iDat.bne;
@@ -1815,7 +1800,7 @@ module ZionRiscvIsaLib_IntEx
       oDat.BjTgt   = BjTgtAddrRlst;
     end
     `ZionRiscvIsaLib_AddSubLessThan (U_AddSubLessThan, AddSubIf, unsignedFlg, lessThanFlg, sltRslt);
-    `ZionRiscvIsaLib_BjEnNoLessThan (U_BjEnNoLt , BjIf.Ex, lessThanFlg, oDat.BjEn );
+    `ZionRiscvIsaLib_BjEnNoLessThan (U_BjEnNoLt , BjIf.Ex, lessThanFlg, oDat.bjEn );
     `ZionRiscvIsaLib_BjTgtAddr(U_BjTgtAddr, BjIf.Ex,              BjTgtAddrRlst);
     `gen_if(INT_MODULE_TYPE==0)  
         assign oDat.memAddr = (iDat.memEn)? addSubRslt : '0;
@@ -1832,7 +1817,7 @@ module ZionRiscvIsaLib_IntEx
     end
     `ZionRiscvIsaLib_SetLessThan(U_SetLessThan,SltIf,SltRslt);
   end
-`Unuse_ZionBasicCircuitLib(Bc)
+ `Unuse_ZionBasicCircuitLib(Bc)
 endmodule: ZionRiscvIsaLib_IntEx
 
 //endsection: IntEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
