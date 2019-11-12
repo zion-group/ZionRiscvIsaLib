@@ -59,7 +59,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   always_comb begin
     notRvc          = (opLow==2'b11);                  // whether it's RVC instructions. 0-RVC ins.  1-Not RVC ins.
     bigImmInsFlg    = (opHigh ==? 5'b0?101) & notRvc;  // big immediate operand instructions: LUI, AUIPC
-    opHigh_110xx    = (opHigh ==  5'b110??);           // the signal is used in branch and jump decode.
+    opHigh_110xx    = (opHigh ==? 5'b110??);           // the signal is used in branch and jump decode.
     bjInsFlg        = opHigh_110xx & (opHigh[1:0]!=2'b10) & notRvc; // branch and jump instructions
     jumpInsFlg      = opHigh_110xx & opHigh[0] & notRvc;            // jump instructions: JAL, JALR
     branchInsFlg    = opHigh_110xx & (opHigh[1:0]==2'b00) & notRvc; // branch instructions: BEQ, BNE, BLE[U], BGE[U]
@@ -98,8 +98,8 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
     insUtype  = bigImmInsFlg; // Utype is only used for big immediate instructions
     insJtype  = jalFlg      ; // Jtype is only used for JAL
     rdEnable  = ~(insStype & insBtype);              // only Stype and Btype instructions do not have rd.
-    rs1Enable = ~(insUtype & insJtype & csrUimmFlg); // only Utype, Jtype and csr with imm do not have rs1.
-    rs2Enable = insItype | insStype | insBtype;      // only Itype, Stype and Btype have rs2.
+    rs1Enable = ~(insUtype | insJtype | csrUimmFlg); // only Utype, Jtype and csr with imm do not have rs1.
+    rs2Enable = insRtype | insStype | insBtype;    // only Itype, Stype and Btype have rs2.
   end
 
   logic intNoWImmInsFlg, intWImmInsFlg, intNoWRs2InsFlg, intWRs2InsFlg;
@@ -737,8 +737,9 @@ module ZionRiscvIsaLib_AddSubExec
   always_comb begin
     s1      = iAddSubExIf.s1;
     s2      = iAddSubExIf.s2;
-    rsltTmp = `BcAddSubdM(addEn,subEn,s1,s2);
+    rsltTmp = `BcAddSubM(addEn,subEn,s1,s2);
   end
+    `BcAddSub(U_AddSub,addEn,subEn,s1,s2,rsltTmp);
   `gen_if(RV64) begin : Rv64RsltGen
     wire WFlg = iAddSubExIf.op[2];
     assign oRslt = (WFlg) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
@@ -1781,7 +1782,7 @@ module ZionRiscvIsaLib_IntEx
     always_comb begin
       AddSubIf.s1    = S1LinkOffsetMuxRlst;
 
-      BjIf.bjEn        = iDat.bjIns;
+      BjIf.bjIns        = iDat.bjIns;
       BjIf.branch      = iDat.branch;
       BjIf.beq         = iDat.beq;
       BjIf.bne         = iDat.bne;
