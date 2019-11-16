@@ -1079,7 +1079,20 @@ module ZionRiscvIsaLib_BjEnNoLessThan
               |(iBjExIf.bge & !iLessThan);     // Bge  instuction lead to branch&jump
   end
 
-  //TODO: add assert
+ always_comb begin
+    assert($onehot0({iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge, iBjExIf.jump})) 
+    else $error("Signal Error: More than 1 'xxEn' signals are activated in iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge, iBjExIf.jump which only one could work.");
+  end
+
+  always_comb begin
+    assert((($onehot0({iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge})) | iBjExIf.jump) & iBjExIf.bjEn)
+    else $error("Signal Error:iBjExIf.branch and iBjExIf.bjEn are activated Simultaneously when one of iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge and iBjExIf.jump is high.");
+  end
+
+  always_comb begin
+    assert((iBjExIf.jump & ~iBjExIf.branch & iBjExIf.bjEn)|(~iBjExIf.jump & iBjExIf.branch & iBjExIf.bjEn)) 
+    else $error("Signal Error: iBjExIf.jump and iBjExIf.branch can not be activated Simultaneously.");
+  end 
 
 endmodule: ZionRiscvIsaLib_BjEnNoLessThan
 `endif
