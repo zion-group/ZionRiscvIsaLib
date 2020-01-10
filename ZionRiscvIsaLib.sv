@@ -1,3 +1,4 @@
+//`include "/home/train/gaoyudi/MacroCircuitLib/src/ZionBceLib/ZionBasicCircuitLib.vm"
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface name : ZionRiscvIsaLib_RvimazDecodeItf
 // Author         : Wenheng Ma
@@ -29,16 +30,18 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
   logic [4:0] opHigh;
   logic [1:0] opLow ;
   logic [4:0] rs1, rs2, rd;
-  logic [CPU_WIDTH-1:0] shamt, immItype, immStype, immBtype, immUtype, immJtype, uimm;
+  logic [CPU_WIDTH-1:0] shamt, immItype, immStype, immBtype, immUtype, immJtype, uimm, UimmItype, UimmBtype;
   always_comb begin
-    {funct7,rs2,rs1,funct3,rd,opHigh,opLow} =ins;
-    immItype = unsigned'(type_Signed'({ins[31:20]}));
-    immStype = unsigned'(type_Signed'({ins[31:25],ins[11:7]}));
-    immBtype = unsigned'(type_Signed'({ins[31],ins[7],ins[30:25],ins[11:8],1'b0}));
-    immUtype = unsigned'(type_Signed'({ins[31:12],12'h000}));
-    immJtype = unsigned'(type_Signed'({ins[31],ins[19:12],ins[20],ins[30:21],1'b0}));
-    shamt    = unsigned'(type_Signed'({ins[(24+RV64):20]}));
-    uimm     = unsigned'(type_Signed'({ins[19:15]}));
+     {funct7,rs2,rs1,funct3,rd,opHigh,opLow} =ins;
+     immItype =    signed'({ins[31:20]});
+     UimmItype = unsigned'({ins[31:20]});
+     immStype = signed'({ins[31:25],ins[11:7]});
+     immBtype = signed'({ins[31],ins[7],ins[30:25],ins[11:8],1'b0});
+     UimmBtype = unsigned'({ins[31],ins[7],ins[30:25],ins[11:8],1'b0});
+     immUtype = signed'({ins[31:12],12'h000});
+     immJtype = signed'({ins[31],ins[19:12],ins[20],ins[30:21],1'b0});
+     shamt    = unsigned'(type_Signed'({ins[(24+RV64):20]}));
+     uimm     = unsigned'(type_Signed'({ins[19:15]}));
   end
 
   logic [7:0] f3Oh;
@@ -97,7 +100,7 @@ interface ZionRiscvIsaLib_RvimazDecodeItf
     insBtype  = branchInsFlg; // Btype is only used for branch instructions
     insUtype  = bigImmInsFlg; // Utype is only used for big immediate instructions
     insJtype  = jalFlg      ; // Jtype is only used for JAL
-    rdEnable  = ~(insStype & insBtype);              // only Stype and Btype instructions do not have rd.
+    rdEnable  = ~(insStype | insBtype);              // only Stype and Btype instructions do not have rd.
     rs1Enable = ~(insUtype | insJtype | csrUimmFlg); // only Utype, Jtype and csr with imm do not have rs1.
     rs2Enable = insRtype | insStype | insBtype;    // only Itype, Stype and Btype have rs2.
   end
@@ -712,11 +715,6 @@ endinterface : ZionRiscvIsaLib_AddSubExItf
   `__DefErr__(ZionRiscvIsaLib_AddSubExec)
 `else
   `define ZionRiscvIsaLib_AddSubExec(UnitName,iAddSubExIf_MT,oRslt_MT)   \
-// `ifdef VIVADO_SYN                                                        \
-//     localparam UnitName``_RV64 = iAddSubExIf_MT.RV64;                    \
-//   `else                                                                  \
-//     localparam UnitName``_RV64 = $bits(iAddSubExIf_MT.s1)/32-1;          \
-//   `endif                                                                 \
   ZionRiscvIsaLib_AddSubExec#(.CPU_WIDTH($bits(oRslt_MT)))               \
                             UnitName(                                    \
                               .iAddSubExIf(iAddSubExIf_MT),              \
@@ -739,7 +737,7 @@ module ZionRiscvIsaLib_AddSubExec
     s2      = iAddSubExIf.s2;
     rsltTmp = `BcAddSubM(addEn,subEn,s1,s2);
   end
-    `BcAddSub(U_AddSub,addEn,subEn,s1,s2,rsltTmp);
+    //`BcAddSub(U_AddSub,addEn,subEn,s1,s2,rsltTmp);
   `gen_if(RV64) begin : Rv64RsltGen
     wire WFlg = iAddSubExIf.op[2];
     assign oRslt = (WFlg) ? {{32{rsltTmp[31]}},rsltTmp[31:0]} : rsltTmp;
@@ -961,10 +959,6 @@ interface ZionRiscvIsaLib_BjExItf
   function automatic logic LessThan;
 
     logic signed [CPU_WIDTH:0] s1Extd, s1Mask, s2Extd, s2Mask;
-    // s1Extd = {((~unsignedFlg) & s1[CPU_WIDTH-1]) , s1}; // Extend s1 according unsignedFld // TODO: use HighBit
-    // s2Extd = {((~unsignedFlg) & s2[CPU_WIDTH-1]) , s2}; // Extend s2 according unsignedFld// TODO: use HighBit
-    // s1Mask = {$bits(s1Extd){branch}} & s1Extd; // TODO: use Mask
-    // s2Mask = {$bits(s2Extd){branch}} & s2Extd; // TODO: use Mask
     s1Extd = {((~unsignedFlg) & `BcHighB(s1)) , s1}; 
     s2Extd = {((~unsignedFlg) & `BcHighB(s2)) , s2};
     s1Mask =`BcMaskM(branch,s1Extd);
@@ -991,7 +985,7 @@ interface ZionRiscvIsaLib_BjExItf
 
   modport De( output bjIns, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset);
   modport Ex( input  bjIns, branch, beq, bne, blt, bge, unsignedFlg, jump, pc, s1, s2, offset, linkOffset,
-              import LessThan
+              import LessThan,TgtAddrGen,S1LinkOffsetMux,LinkPcGen
             );
   `Unuse_ZionBasicCircuitLib(Bc)
 endinterface : ZionRiscvIsaLib_BjExItf
@@ -1025,7 +1019,7 @@ ZionRiscvIsaLib_BjTgtAddr  #(.CPU_WIDTH($bits(oTgtAddr_MT)))           \
 module ZionRiscvIsaLib_BjTgtAddr
 #(CPU_WIDTH =32
  )(
-  ZionRiscvIsaLib_BjExItf iBjExIf,
+  ZionRiscvIsaLib_BjExItf.Ex iBjExIf,
   output logic [CPU_WIDTH-1:0] oTgtAddr
 );
 
@@ -1075,24 +1069,9 @@ module ZionRiscvIsaLib_BjEnNoLessThan
     oBjEn    = iBjExIf.jump 
               |(iBjExIf.beq & equal)
               |(iBjExIf.bne & !equal) 
-              |(iBjExIf.blt & iLessThan)       // Blt  instuction lead to branch&jump
-              |(iBjExIf.bge & !iLessThan);     // Bge  instuction lead to branch&jump
+              |(iBjExIf.blt & iLessThan & ~equal)       // Blt  instuction lead to branch&jump
+              |(iBjExIf.bge & (!iLessThan | equal));     // Bge  instuction lead to branch&jump
   end
-
- always_comb begin
-    assert($onehot0({iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge, iBjExIf.jump})) 
-    else $error("Signal Error: More than 1 'xxEn' signals are activated in iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge, iBjExIf.jump which only one could work.");
-  end
-
-  always_comb begin
-    assert((($onehot0({iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge})) | iBjExIf.jump) & iBjExIf.bjEn)
-    else $error("Signal Error:iBjExIf.branch and iBjExIf.bjEn are activated Simultaneously when one of iBjExIf.beq, iBjExIf.bne, iBjExIf.blt, iBjExIf.bge and iBjExIf.jump is high.");
-  end
-
-  always_comb begin
-    assert((iBjExIf.jump & ~iBjExIf.branch & iBjExIf.bjEn)|(~iBjExIf.jump & iBjExIf.branch & iBjExIf.bjEn)) 
-    else $error("Signal Error: iBjExIf.jump and iBjExIf.branch can not be activated Simultaneously.");
-  end 
 
 endmodule: ZionRiscvIsaLib_BjEnNoLessThan
 `endif
@@ -1128,7 +1107,7 @@ module ZionRiscvIsaLib_BjEnGen
   output logic               oBjEn
 );
 
-  logic lessThan;
+  logic lessThan,bjEn;
   always_comb begin
     lessThan = iBjExIf.LessThan();
   end
@@ -1453,7 +1432,7 @@ module ZionRiscvIsaLib_SftExec
     always_comb begin
       // For ShiftW instructions(SLLW/SRLW/SRAW), the highest bit in SftExIf.s2 is not used. 
       // Thus this bit must be 0 for ShiftW.
-      assert ($onehot0({sftW, iSftExIf.s2[5]})) 
+      assert ($onehot0({iSftExIf.op[3], iSftExIf.s2[5]})) 
       else $error("Signal Error: Both of sftA and sftL are activated which only one could work at a certain time.");
     end
   end
@@ -1461,177 +1440,6 @@ module ZionRiscvIsaLib_SftExec
 endmodule: ZionRiscvIsaLib_SftExec
 `endif
 //endsection: ShiftEx ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Interface name : ZionRiscvIsaLib_LoadExItf
-// Author         : Wenheng Ma
-// Date           : 2019-08-02
-// Version        : 1.0
-// Description    :
-//   Define signals that load ISAs nead. And offer an Excution function to get the load operation result.
-//   Load operation contains 7 instructions: 
-//     - LB/LBU, LH/LHU, LW (R32I)
-//     - LWU, LD            (R64I)
-//   Enables for each load ins is combined in loadEn:
-//     loadEn[0]-LB[U]   loadEn[1]-LH[U]   loadEn[2]-LW[U]   loadEn[3]-LD
-//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
-// Modification History:
-//   Date   |   Author   |   Version   |   Change Description
-//======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// `ifndef Disable_ZionRiscvIsaLib_LoadExItf
-// interface ZionRiscvIsaLib_LoadExItf
-// #(RV64 = 0);
-
-//   localparam CPU_WIDTH = 32*(RV64+1);
-//   logic [(2+RV64):0] loadEn;
-//   logic              unsignedLoad;
-//   logic [(1+RV64):0] addr;
-//   logic [CPU_WIDTH-1:0] memDat;
-
-//   function automatic logic [CPU_WIDTH-1:0] Exec;
-    
-//     logic [CPU_WIDTH-1:0] result;
-//     // LB 
-//     logic [CPU_WIDTH/8-1:0][7:0] byteSplitDat;
-//     logic                  [7:0] byteLoadDat;
-//     logic                        byteMsb,byteExtend;
-//     logic [CPU_WIDTH-1  :0]      byteLoadRslt;
-//     // LH
-//     logic [CPU_WIDTH/16-1:0][15:0] halfwordSplitDat;
-//     logic                   [15:0] halfwordLoadDat;
-//     logic                          halfwordMsb,halfwordExtend;
-//     logic [CPU_WIDTH-1   :0]       halfwordLoadRslt;
-//     // LW
-//     logic [CPU_WIDTH/32-1:0][31:0] wordSplitDat;
-//     logic                   [31:0] wordLoadDat;
-//     logic                          wordMsb,wordExtend;
-//     logic [CPU_WIDTH-1   :0]       wordLoadRslt;
-//     // LD
-//     logic [CPU_WIDTH-1   :0] doubleLoadRslt;
-//     // LB
-//     byteSplitDat = memDat;
-//     byteLoadDat  = byteSplitDat[addr];//[addr[$high(addr):0]]
-//     byteExtend   = (~unsignedLoad) & byteLoadDat[$high(byteLoadDat)];
-//     byteLoadRslt = {CPU_WIDTH{loadEn[0]}} & {{(CPU_WIDTH-$bits(byteLoadDat)){byteExtend}}, byteLoadDat};
-//     // LH
-//     halfwordSplitDat = memDat;
-//     halfwordLoadDat  = halfwordSplitDat[addr[$high(addr)]];//addr[$high(addr):1]
-//     halfwordExtend   = (~unsignedLoad) & halfwordLoadDat[$high(halfwordLoadDat)];
-//     halfwordLoadRslt = {CPU_WIDTH{loadEn[1]}} & {{(CPU_WIDTH-$bits(halfwordLoadDat)){halfwordExtend}}, halfwordLoadDat};
-//     `gen_if(RV64==0)begin
-//       // LW for RV32
-//       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & memDat;
-//       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt;
-//     end `gen_else begin//`gen_elif(RV64==1)
-//       // LW for RV64
-//       wordSplitDat = memDat;
-//       wordLoadDat  = wordSplitDat[addr[$high(addr)]];//[addr[$high(addr):2]]
-//       wordExtend   = (~unsignedLoad) & wordLoadDat[$high(wordLoadDat)];
-//       wordLoadRslt = {CPU_WIDTH{loadEn[2]}} & {{(CPU_WIDTH-$bits(wordLoadDat)){wordExtend}}, wordLoadDat};
-//       //LD for RV64
-//       doubleLoadRslt = {CPU_WIDTH{loadEn[3]}} & memDat;
-//       result = byteLoadRslt | halfwordLoadRslt | wordLoadRslt | doubleLoadRslt;
-//     end
-//     return result;
-
-//   endfunction: Exec
-
-//   modport De (output loadEn, unsignedLoad, addr, memDat);
-//   modport Ex (input  loadEn, unsignedLoad, addr, memDat, import Exec);
-
-// endinterface: ZionRiscvIsaLib_LoadExItf
-// `endif
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Interface name : ZionRiscvIsaLib_StoreExItf
-// Author         : Wenheng Ma
-// Date           : 2019-08-02
-// Version        : 1.0
-// Description    :
-//   Define signals that store ISAs nead. And offer an Excution function to get the load operation result.
-//   Store operation contains  instructions: SB, SH, SW, SD(only for R64I). 
-//   Enables for each store ins is combined in storeEn:
-//     storeEn[0]-SB   storeEn[1]-SH   storeEn[2]-SW   storeEn[3]-SD
-//   Parameter RV64 indicate whether the processor is 64-bit core with the ISA of RV64I.
-// Modification History:
-//   Date   |   Author   |   Version   |   Change Description
-//======================================================================================================================
-// 19-08-02 | Wenheng Ma |     1.0     |   Original Version
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// `ifndef Disable_ZionRiscvIsaLib_StoreExItf
-// interface ZionRiscvIsaLib_StoreExItf
-// #(RV64 = 0);
-
-//   localparam CPU_WIDTH = 32*(RV64+1);
-//   localparam int STORE_WIDTH = {8,16,32};
-//   logic [(2+RV64):0] storeEn;
-//   logic [(1+RV64):0] addr;
-//   logic [CPU_WIDTH-1:0] storeDat;
-
-//   function automatic logic [CPU_WIDTH-1:0] Exec;
-    
-//     typedef logic [CPU_WIDTH  -1:0] type_WrDat;
-//     typedef logic [CPU_WIDTH/8-1:0] type_WrEn;
-//     logic [CPU_WIDTH  -1:0] wrDat;
-//     logic [CPU_WIDTH/8-1:0] wrEn;
-//     //SB
-//     logic [CPU_WIDTH/8-1:0][7:0] byteWrDat;
-//     logic [CPU_WIDTH/8-1:0]      byteWrEn;
-//     //SH
-//     logic [CPU_WIDTH/16-1:0][15:0] halfwordWrDat;
-//     logic [CPU_WIDTH/16-1:0][ 1:0] halfwordWrEn;
-//     //SW
-//     logic [CPU_WIDTH/32-1:0][31:0] wordWrDat;
-//     logic [CPU_WIDTH/32-1:0][ 3:0] wordWrEn;
-//     //SD
-//     logic [CPU_WIDTH/-1:0] doubleWrDat;
-//     logic [           7:0] doubleWrEn;
-//     //SB
-//     byteWrDat = '0;
-//     byteWrEn  = '0;
-//     byteWrDat[addr[$high(addr):0]] = {8{storeEn[0]}} & storeDat[0+:8];
-//     byteWrEn[addr[$high(addr):0]]  = storeEn[0];
-//     //SH
-//     halfwordWrDat = '0;
-//     halfwordWrEn  = '0;
-//     halfwordWrDat[addr[$high(addr):1]] = {16{storeEn[1]}} & storeDat[0+:16];
-//     halfwordWrEn[addr[$high(addr):1]]  = {2{storeEn[1]}};
-//     `gen_if(RV64==0) begin
-//       //SW for RV32
-//       wordWrDat = {31storeEn[2]} & storeDat;
-//       wordWrEn  = {4{storeEn[2]}};
-//       wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | wordWrDat;
-//       wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | wordWrEn;
-//     end `gen_elif(RV64==1) begin
-//       //SW for RV64
-//       wordWrDat = '0;
-//       wordWrEn  = '0;
-//       wordWrDat[addr[$high(addr):2]] = {32{storeEn[2]}} & storeDat[0+:32];
-//       wordWrEn[addr[$high(addr):2]]  = {4{storeEn[2]}};
-//       //SD for RV64
-//       doubleWrDat = {31storeEn[3]} & storeDat;
-//       doubleWrEn  = {8{storeEn[3]}};
-//       wrDat = type_WrDat'(byteWrDat) | type_WrDat'(halfwordWrDat) | type_WrDat'(wordWrDat) | doubleWrDat;
-//       wrEn  = type_WrEn'(byteWrEn)   | type_WrEn'(halfwordWrEn)   | type_WrEn'(wordWrEn)   | doubleWrEn;
-//     end
-
-//     return {rsltMask, rsltDat};
-
-//   endfunction: Exec
-
-//   modport De (output storeEn, addr, memDat);
-//   modport Ex (input  storeEn, addr, memDat, import Exec);
-
-// endinterface: ZionRiscvIsaLib_StoreExItf
-// `endif
-
-
 
 //section: IntEx +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Circuits integrate all execution module of RV32I/RV64I instructions.
@@ -1672,7 +1480,7 @@ interface ZionRiscvIsaLib_IntInsExItf
   logic andEn, orEn, xorEn;
   logic sltEn, bjIns, branch, beq, bne, blt, bge, jump;
   logic sftLeft, sftRight, sftA;
-  logic memEn;
+  logic memEn, memwrEn;
   logic bjEn;
   logic [1:0] linkOffset;
   logic [CPU_WIDTH-1:0] intRslt, BjTgt, memAddr;
@@ -1681,14 +1489,14 @@ interface ZionRiscvIsaLib_IntInsExItf
   modport IntBjMemDeOut (output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                                 sftLeft, sftRight, sftA, sltEn,
                                 addSubIns, bjIns, branch, beq, bne, blt, bge, jump, linkOffset, 
-                                memEn
+                                memwrEn, memEn
                         );
   modport IntBjMemExIn  (input  pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
                                 sftLeft, sftRight, sftA, sltEn,
                                 addSubIns, bjIns, branch, beq, bne, blt, bge, jump, linkOffset,
-                                memEn
+                                memwrEn, memEn
                         );
-  modport IntBjMemExOut(output  intRslt, bjEn, BjTgt, memAddr);
+  modport IntBjMemExOut(output  intRslt, bjEn, BjTgt, memAddr, memwrEn);
 
   // modport for integer instructions excution with branch&jump.
   modport IntBjDeOut(output pc, s1, s2, offset, flags, addEn, subEn, andEn, orEn, xorEn,
@@ -1790,12 +1598,12 @@ module ZionRiscvIsaLib_IntEx
 
   `gen_if(INT_MODULE_TYPE==0 | INT_MODULE_TYPE==1) begin: IntModuleType_0_1
     wire lessThanFlg = `BcHighB(addSubRslt);
-    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, S1LinkOffsetMuxRlst);
     ZionRiscvIsaLib_BjExItf#(RV64) BjIf();
+    `ZionRiscvIsaLib_S1LinkOffsetMux (U_S1LinkOffsetMux, BjIf.Ex, S1LinkOffsetMuxRlst);
     always_comb begin
-      AddSubIf.s1    = S1LinkOffsetMuxRlst;
+      AddSubIf.s1      = S1LinkOffsetMuxRlst;
 
-      BjIf.bjIns        = iDat.bjIns;
+      BjIf.bjIns       = iDat.bjIns;
       BjIf.branch      = iDat.branch;
       BjIf.beq         = iDat.beq;
       BjIf.bne         = iDat.bne;
@@ -1809,7 +1617,7 @@ module ZionRiscvIsaLib_IntEx
       BjIf.s2          = iDat.s2;
       BjIf.offset      = iDat.offset;
 
-      oDat.intRslt = BitsRslt  | `BcMaskM((iDat.addSubIns|iDat.jump),addSubRslt) 
+      oDat.intRslt = BitsRslt  | `BcMaskM((iDat.addSubIns|iDat.jump),addSubRslt)
                     |SftRslt   | `BcZeroExtdM((sltRslt & iDat.sltEn),CPU_WIDTH);
       oDat.BjTgt   = BjTgtAddrRlst;
     end
